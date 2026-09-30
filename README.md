@@ -1,59 +1,74 @@
-# Introduction to GitHub
+# Prospecção de Clientes — fios, cabos elétricos e cabos especiais
 
-<!-- ![](https://github.com/LittleMath06/skills-introduction-to-github/actions/workflows/0-start-exercise.yml/badge.svg) -->
-![](https://github.com/LittleMath06/skills-introduction-to-github/actions/workflows/1-create-a-branch.yml/badge.svg)
-![](https://github.com/LittleMath06/skills-introduction-to-github/actions/workflows/2-commit-a-file.yml/badge.svg)
-![](https://github.com/LittleMath06/skills-introduction-to-github/actions/workflows/3-open-a-pull-request.yml/badge.svg)
-![](https://github.com/LittleMath06/skills-introduction-to-github/actions/workflows/4-merge-your-pull-request.yml/badge.svg)
+Sistema web **privado, de usuário único** (Paulo Alarcon) para encontrar, analisar e priorizar
+potenciais clientes em todo o Brasil, usando como referência a base de empresas que Paulo já atende.
 
-_Get started using GitHub in less than an hour._
+> Pergunta que o sistema responde: *"Quais empresas ainda não atendo, mas têm características
+> semelhantes às que já compram nossos produtos?"*
 
-## Welcome
+## O que faz
 
-People use GitHub to build some of the most advanced technologies in the world. Whether you’re visualizing data or building a new game, there’s a whole community and set of tools on GitHub that can help you do it even better. GitHub Skills’ “Introduction to GitHub” exercise guides you through everything you need to start contributing in less than an hour.
+* Importa empresas dos **dados abertos oficiais do CNPJ** (Receita Federal), filtradas por CNAE/UF.
+* Importa a **base de clientes atuais** (CSV/XLSX), valida CNPJs, remove duplicidades e calcula o
+  **perfil de cliente ideal**.
+* Classifica cada empresa em **segmentos** (Instaladores, Distribuidores, Energia, Agro…) e calcula
+  **compatibilidade** e **potencial** — sempre como estimativas, com a explicação de cada ponto.
+* Busca com **filtros combináveis** e **pesquisa livre** ("instaladores em Minas Gerais",
+  "semelhantes aos meus clientes").
+* **Cartão da empresa** com cadastro, atividade, contatos (com origem), informações fiscais
+  classificadas em *confirmado / provável / possível* com fonte e data, histórico de alterações.
+* **Leads**: salvar, status comercial configurável, favoritos, analisados, descartados, observações.
+* **Atualização periódica**, jobs em segundo plano com progresso, painel de status das fontes.
 
-- **Who is this for**: New developers, new GitHub users, and students.
-- **What you'll learn**: We'll introduce repositories, branches, commits, and pull requests.
-- **What you'll build**: We'll make a short Markdown file you can use as your [profile README](https://docs.github.com/account-and-profile/setting-up-and-managing-your-github-profile/customizing-your-profile/managing-your-profile-readme).
-- **Prerequisites**: None. This exercise is a great introduction for your first day on GitHub.
-- **How long**: This exercise takes less than one hour to complete.
+## Início rápido (desenvolvimento)
 
-In this exercise, you will:
+```bash
+python3.11 -m venv .venv && . .venv/bin/activate
+pip install -r requirements-dev.txt
+cp .env.example .env          # preencha SECRET_KEY e ADMIN_PASSWORD
+export PYTHONPATH=src
+python -m prospeccao.cli init
+python -m prospeccao.cli seed-mock      # opcional: dados FICTÍCIOS (marcados MOCK)
+uvicorn prospeccao.main:app_factory --factory --reload
+```
 
-1. Create a branch
-2. Commit a file
-3. Open a pull request
-4. Merge your pull request
+Acesse <http://localhost:8000>. Testes: `pytest` (124 testes; também em PostgreSQL com
+`TEST_DATABASE_URL`).
 
-### How to start this exercise
+## Produção
 
-1. Right-click **Copy Exercise** and open the link in a new tab.
+`docker compose up -d --build` (app + PostgreSQL + Caddy com HTTPS automático). Detalhes de
+configuração, backup, atualização mensal e monitoramento em
+[docs/10-documentacao-final.md](docs/10-documentacao-final.md#24-deploy).
 
-   <a id="copy-exercise">
-      <img src="https://img.shields.io/badge/📠_Copy_Exercise-AAA" height="25pt"/>
-   </a>
+## Documentação
 
-2. In the new tab, most of the prompts will automatically fill in for you.
-   - For owner, choose your personal account or an organization to host the repository.
-   - We recommend creating a public repository, as private repositories will [use Actions minutes](https://docs.github.chttps://github.com/LittleMath06/skills-introduction-to-github/billing/managing-billing-for-github-actions/about-billing-for-github-actions).
-   - Scroll down and click the **Create repository** button at the bottom of the form.
+| Documento | Conteúdo |
+|---|---|
+| [01 — Requisitos](docs/01-requisitos.md) | problema, requisitos, regras, riscos, informações faltantes |
+| [02 — Fontes de dados](docs/02-fontes-de-dados.md) | pesquisa e decisão sobre cada fonte (licença, limites, termos) |
+| [03 — Arquitetura](docs/03-arquitetura.md) | camadas, tecnologias, fluxo de dados, segurança |
+| [04 — Banco de dados](docs/04-database.md) | DER, índices, rastreabilidade |
+| [05 — UX/wireframes](docs/05-ux-wireframes.md) | fluxos e telas |
+| [06 — API](docs/06-api.md) | endpoints, filtros, códigos de erro |
+| [10 — Documentação final](docs/10-documentacao-final.md) | visão completa, metodologias, testes, resultados, limitações, instalação, deploy |
 
-3. After your new repository is created, wait about 20 seconds for the exercise to be prepared and buttons updated. You will continue working from your copy of the exercise.
-   - The **Copy Exercise** button will deactivate, changing to gray.
-   - The **Start Exercise** button will activate, changing to green.
-   - You will likely need to refresh the page.
+## Estrutura
 
-4. Click **Start Exercise**. Follow the step-by-step instructions and feedback will be provided as you progress.
+```
+src/prospeccao/
+  domain/     regras puras (CNPJ, segmentos, similaridade, potencial, pesquisa livre, fiscal)
+  services/   casos de uso (busca, importações, enriquecimento, leads, jobs, dashboard)
+  sources/    integrações (Receita, API de CNPJ, SEFAZ, site oficial) — camada DataSource
+  api/        REST JSON          web/  páginas        templates/ static/  interface
+  models.py   banco (SQLAlchemy) security.py  autenticação, CSRF, rate limit    cli.py  administração
+tests/        unitários, integração, funcionais, negativos e interface (Playwright)
+scripts/      backup, restauração, atualização via cron, benchmark
+deploy/       Caddyfile (HTTPS)
+```
 
-   <a id="start-exercise" href="https://github.com/LittleMath06/skills-introduction-to-github/issues/1">
-      <img src="https://img.shields.io/badge/🚀_Start_Exercise-008000" height="25pt"/>
-   </a>
+## Princípios
 
-> [!IMPORTANT]
-> The **Start Exercise** button will activate after copying the repository. You will probably need to refresh the page.
-
----
-
-Get help: [Post in our discussion board](https://github.com/orgs/skills/discussions/categories/introduction-to-github) &bull; [Review the GitHub status page](https://www.githubstatus.com/)
-
-&copy; 2024 GitHub &bull; [Code of Conduct](https://www.contributor-covenant.org/version/2/1/code_of_conduct/code_of_conduct.md) &bull; [MIT License](https://gh.io/mit)
+Nenhum dado inventado · toda informação externa com fonte e data · estimativas sempre rotuladas ·
+nenhum segredo no Git · scraping somente do site da própria empresa, respeitando robots.txt ·
+LGPD: sem dados de sócios, contatos pessoais sinalizados, exclusão sob demanda.
