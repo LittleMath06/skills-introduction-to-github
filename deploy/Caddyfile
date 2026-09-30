@@ -1,0 +1,11 @@
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy app:8000
+	header {
+		-Server
+	}
+	log {
+		output stdout
+		format console
+	}
+}

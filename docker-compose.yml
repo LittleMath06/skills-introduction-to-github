@@ -1,0 +1,50 @@
+# Produção: app + PostgreSQL + Caddy (HTTPS automático via Let's Encrypt)
+# Uso: cp .env.example .env  (preencher)  →  docker compose up -d --build
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: prospeccao
+      POSTGRES_USER: prospeccao
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prospeccao"]
+      interval: 10s
+      retries: 5
+
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      APP_ENV: production
+      ALLOW_MOCK_DATA: "false"
+      DATABASE_URL: postgresql+psycopg://prospeccao:${POSTGRES_PASSWORD}@db:5432/prospeccao
+      DATA_DIR: /data
+    volumes:
+      - appdata:/data
+      # certificado digital (opcional, somente leitura) para a consulta SEFAZ
+      # - ./secrets:/run/secrets:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    expose: ["8000"]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      DOMAIN: ${DOMAIN:?defina DOMAIN no .env}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+    depends_on: [app]
+
+volumes:
+  pgdata:
+  appdata:
+  caddydata:
