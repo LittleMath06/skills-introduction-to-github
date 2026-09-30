@@ -4,7 +4,8 @@ Sistema de Prospecção de Clientes — fios, cabos elétricos e cabos especiais
 
 Documentos de apoio: [01 Requisitos](01-requisitos.md) · [02 Fontes de dados](02-fontes-de-dados.md) ·
 [03 Arquitetura](03-arquitetura.md) · [04 Banco de dados](04-database.md) ·
-[05 UX/wireframes](05-ux-wireframes.md) · [06 API](06-api.md)
+[05 UX/wireframes](05-ux-wireframes.md) · [06 API](06-api.md) ·
+[07 Análise da base de clientes](07-analise-base-clientes.md)
 
 ---
 
@@ -56,7 +57,7 @@ Situação na v1:
 | Requisito | Situação |
 |---|---|
 | RF01 login / RF21 API documentada | ✅ |
-| RF02 importação da base de clientes (CSV/XLSX, validação, deduplicação, relatório) | ✅ |
+| RF02 importação da base de clientes (CSV/XLSX, validação, deduplicação, relatório) | ✅ inclusive listas só com nomes (formato da planilha recebida) |
 | RF03 perfil de cliente ideal | ✅ |
 | RF04 importação dos dados abertos do CNPJ (filtrada) / RF18 mudanças e baixas | ✅ (layout validado com arquivos de teste; validar com o arquivo real do mês — ver §20) |
 | RF05 consulta pontual de CNPJ | ✅ (BrasilAPI/OpenCNPJ, cache 30 dias) |
@@ -209,14 +210,14 @@ confirmação. "Confirmado" somente via SEFAZ.
 
 ## 18. Testes realizados
 
-Executados em 30/09/2026 nesta versão — **124 testes, todos aprovados em SQLite e em PostgreSQL 16**:
+Executados em 30/09/2026 nesta versão — **133 testes, todos aprovados em SQLite e em PostgreSQL 16**:
 
 | Arquivo | Tipo | Qtde | Cobre |
 |---|---|---|---|
-| `test_domain.py` | unitários | 50 | CNPJ (incl. alfanumérico, zeros perdidos em planilha, inválidos), telefones/e-mails, regiões, classificação por CNAE/palavra-chave/fallback, similaridade, pesos, potencial, completude, inferência de ICMS, pesquisa livre |
+| `test_domain.py` | unitários | 53 | CNPJ (incl. alfanumérico, zeros perdidos em planilha, inválidos), telefones/e-mails, regiões, classificação por CNAE/palavra-chave/fallback, similaridade, pesos, potencial, completude, inferência de ICMS, pesquisa livre, chaves de nome e abreviações de ERP, redistribuição de pesos sem dados |
 | `test_sources.py` | integração (HTTP simulado) | 23 | layout Receita, ZIP latin-1, download inválido, API de CNPJ (200/404/429/500/sem rede/JSON inválido), rate limiter, SEFAZ (111/259/erro/XML inválido/não configurada), site (contatos, pessoal × empresa, robots.txt, robots indisponível, não-HTML, verificação de propriedade) |
-| `test_imports.py` | integração (banco) | 11 | importação filtrada, reimportação idempotente, mudanças e baixas, filtros por UF, falha de fonte registrada, pontuação após importação, CSV/XLSX de clientes com CNPJ inválido/CPF/duplicado/sem CNPJ/linhas vazias/cabeçalho deslocado, arquivos inválidos, vínculo com empresas e perfil, CNPJ duplicado no mesmo lote, truncamento de campos longos |
-| `test_api.py` | funcionais e negativos | 38 | login/logout, senha errada, rate limit, CSRF, todas as rotas protegidas, cabeçalhos, hash de senha, configuração insegura em produção, MOCK bloqueado, filtros/ordenação/paginação, pesquisa livre, filtros inválidos (422), 404, ciclo do lead, segmento manual, informações fiscais com fonte, pesos/segmentos/status, dashboard, consulta de CNPJ com cache e falhas, enriquecimento por site, ICMS confirmado, job com falha, upload inválido, exclusão de contato (LGPD) |
+| `test_imports.py` | integração (banco) | 16 | importação filtrada, reimportação idempotente, mudanças e baixas, filtros por UF, falha de fonte registrada, pontuação após importação, CSV/XLSX de clientes com CNPJ inválido/CPF/duplicado/sem CNPJ/linhas vazias/cabeçalho deslocado, arquivos inválidos, vínculo com empresas e perfil, CNPJ duplicado no mesmo lote, truncamento de campos longos, lista só com nomes (formato da planilha real, com nomes fictícios), identificação pela razão social nos arquivos da Receita (exato, nome cortado, homônimos → ambíguo), vínculo pelo nome na base local, reenvio com CNPJ sem duplicar |
+| `test_api.py` | funcionais e negativos | 39 | login/logout, senha errada, rate limit, CSRF, todas as rotas protegidas, cabeçalhos, hash de senha, configuração insegura em produção, MOCK bloqueado, filtros/ordenação/paginação, pesquisa livre, filtros inválidos (422), 404, ciclo do lead, segmento manual, informações fiscais com fonte, pesos/segmentos/status, dashboard, consulta de CNPJ com cache e falhas, enriquecimento por site, ICMS confirmado, job com falha, upload inválido, exclusão de contato (LGPD), CNPJ manual de cliente |
 | `test_ui.py` | interface (Chromium) | 2 | fluxo completo em desktop e celular: login (inclusive senha errada), pesquisa livre, remoção de filtro, detalhes, salvar lead, status, observação, lista de leads, sem rolagem horizontal, sem erros de JavaScript |
 
 Como rodar: `pytest` (SQLite) · `TEST_DATABASE_URL=postgresql+psycopg://... pytest` (PostgreSQL).
@@ -226,7 +227,12 @@ A CI do GitHub (`.github/workflows/ci.yml`) executa os dois.
 aceito; "Mato Grosso do Sul" interpretado como região Sul; telefone `tel:+55…` com código do país;
 CPF de 11 dígitos não identificado; filtros inválidos retornando 500 em vez de 422; bloqueio de
 escrita do SQLite durante jobs; relacionamentos desatualizados após alterar status/segmento; campo
-de referência maior que a coluna no PostgreSQL; CNPJ repetido no mesmo lote de importação.
+de referência maior que a coluna no PostgreSQL; CNPJ repetido no mesmo lote de importação; linha de
+título ("Relatório de clientes") confundida com cabeçalho de lista de nomes.
+
+**Validação com a planilha real (30/09/2026, banco local de teste, fora do repositório):** 207 linhas →
+205 clientes, 2 duplicados unificados, 0 erros; perfil calculado; reenvio da planilha de apoio
+atualizou os 205 sem duplicar. Detalhes agregados em [07-analise-base-clientes.md](07-analise-base-clientes.md).
 
 **Desempenho (PostgreSQL 16, 300 mil empresas sintéticas MOCK, `scripts/benchmark_search.py`):**
 busca padrão 49 ms · UF + compatibilidade ≥ 70: 40 ms · região + CNAE + telefone: 72 ms · termo livre
@@ -253,8 +259,13 @@ leads salvos que viram "Contato realizado"; % de descartados (indica ajuste de p
 
 ## 20. Limitações
 
-1. **Base de clientes ainda não fornecida.** Sem ela, a compatibilidade fica em 0 (a interface avisa).
-   Ao receber a planilha: importar em *Clientes* e revisar o relatório.
+1. **A base de clientes recebida tem só razões sociais** (205 únicas, sem CNPJ/UF/CNAE). Até os CNPJs
+   serem identificados (automaticamente pela razão social na importação da Receita, ou informados por
+   Paulo), a compatibilidade usa apenas segmento estimado pelo nome e palavras; CNAE, localização e
+   porte ficam "não avaliados". 58 nomes não têm palavra de atividade e só serão classificados pelo
+   CNAE. O título da planilha indica clientes **cotados**, não necessariamente compradores.
+   Vínculos pela razão social podem errar em nomes muito parecidos — ficam marcados para conferência;
+   homônimos ficam "ambíguos" e não são vinculados.
 2. **Fontes reais não exercitadas neste ambiente** (sem rede para `gov.br`/APIs). Layout e contratos
    foram implementados pela documentação oficial e testados com dados simulados. Na implantação:
    `python -m prospeccao.cli check-sources` e primeira importação de um mês real, conferindo o log.
@@ -314,8 +325,10 @@ Todas as opções estão comentadas em [`.env.example`](../.env.example). Princi
 | `WEBSITE_ENRICHMENT_ENABLED` | liga/desliga leitura de sites |
 | `ICMS_CERT_FILE`, `ICMS_KEY_FILE`, `ICMS_ENDPOINTS` | consulta oficial de ICMS |
 
-Fluxo inicial recomendado: 1) importar a base de clientes; 2) importar os dados da Receita (o filtro
-automático usa os CNAEs dos clientes); 3) revisar segmentos e pesos; 4) enriquecer os melhores leads.
+Fluxo inicial recomendado: 1) importar a base de clientes (a planilha só com nomes é aceita);
+2) importar os dados da Receita — o filtro automático usa os CNAEs dos clientes e segmentos, e a
+importação procura os CNPJs dos clientes pela razão social; 3) conferir em *Clientes* os vínculos por
+nome, os ambíguos e completar CNPJs; 4) revisar segmentos e pesos; 5) enriquecer os melhores leads.
 
 ## 24. Deploy
 

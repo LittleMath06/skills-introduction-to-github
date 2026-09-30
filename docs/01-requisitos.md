@@ -125,8 +125,9 @@ indexável). Detalhes em `04-database.md`.
 
 ## 10. Informações faltantes (a confirmar com Paulo)
 
-1. **Arquivo da base de clientes** — ainda não fornecido. O importador detecta colunas por sinônimos;
-   quando o arquivo chegar, validar o relatório de importação (Fase 6.4).
+1. ~~Arquivo da base de clientes~~ — **recebido em 30/09/2026** (lista de 207 razões sociais, sem
+   CNPJ). Análise em [07-analise-base-clientes.md](07-analise-base-clientes.md). Falta: CNPJ/UF dos
+   clientes (planilha de apoio entregue para preenchimento).
 2. Regiões/UFs prioritárias e CNAEs de interesse (para limitar a importação inicial).
 3. Hospedagem desejada (VPS própria, nuvem) e domínio.
 4. Se possui certificado digital A1 (necessário para a consulta oficial de cadastro ICMS na SEFAZ).

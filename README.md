@@ -32,7 +32,7 @@ python -m prospeccao.cli seed-mock      # opcional: dados FICTÍCIOS (marcados M
 uvicorn prospeccao.main:app_factory --factory --reload
 ```
 
-Acesse <http://localhost:8000>. Testes: `pytest` (124 testes; também em PostgreSQL com
+Acesse <http://localhost:8000>. Testes: `pytest` (133 testes; também em PostgreSQL com
 `TEST_DATABASE_URL`).
 
 ## Produção
@@ -51,6 +51,7 @@ configuração, backup, atualização mensal e monitoramento em
 | [04 — Banco de dados](docs/04-database.md) | DER, índices, rastreabilidade |
 | [05 — UX/wireframes](docs/05-ux-wireframes.md) | fluxos e telas |
 | [06 — API](docs/06-api.md) | endpoints, filtros, códigos de erro |
+| [07 — Análise da base de clientes](docs/07-analise-base-clientes.md) | estrutura e padrões da planilha recebida (agregado) |
 | [10 — Documentação final](docs/10-documentacao-final.md) | visão completa, metodologias, testes, resultados, limitações, instalação, deploy |
 
 ## Estrutura

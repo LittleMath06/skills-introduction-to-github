@@ -91,7 +91,8 @@ GET /api/companies?region=Sudeste&segment=Instaladores&has_phone=true&min_simila
 | Método | Rota | Descrição |
 |---|---|---|
 | POST | `/api/customers/import` | `multipart/form-data` campo `file` (.csv/.xlsx, ≤ 20 MB) → job com relatório |
-| GET | `/api/customers` | lista paginada (`status` = ok, sem_cnpj, nao_encontrado) |
+| GET | `/api/customers` | lista paginada (`status` = ok, sem_cnpj, ambiguo, nao_encontrado) |
+| PATCH | `/api/customers/{id}` | `{cnpj}` — informa/corrige o CNPJ de um cliente (409 se o CNPJ já pertence a outro cliente) |
 | GET | `/api/profile` | perfil de cliente ideal |
 
 ## Configuração, monitoramento e processos

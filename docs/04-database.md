@@ -89,8 +89,11 @@ erDiagram
     CUSTOMERS {
         int id PK
         string cnpj UK "nulo permitido"
+        string name_key "nome normalizado (dedup/vínculo sem CNPJ)"
         int company_id FK "nulo se não encontrado"
-        string status "ok|sem_cnpj|nao_encontrado"
+        string status "ok|sem_cnpj|ambiguo|nao_encontrado"
+        string match_method "cnpj|nome_exato|nome_prefixo|nome_receita|manual"
+        string match_note
         json raw
     }
     LEADS {
