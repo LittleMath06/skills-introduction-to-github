@@ -1,0 +1,25 @@
+[project]
+name = "prospeccao"
+version = "1.0.0"
+description = "Sistema privado de prospecção de clientes para fios, cabos elétricos e cabos especiais"
+requires-python = ">=3.11"
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+prospeccao = ["templates/*.html", "static/*"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-p no:cacheprovider"
+filterwarnings = ["ignore::DeprecationWarning"]

@@ -35,3 +35,28 @@
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Sistema de prospecção #
+#########################
+.env
+.env.*
+!.env.example
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+# certificados digitais e chaves NUNCA vão para o Git
+*.pem
+*.pfx
+*.p12
+*.key
+deploy/backups/
