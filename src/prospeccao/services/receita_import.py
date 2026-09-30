@@ -27,7 +27,9 @@ from ..sources.receita import (
     parse_lookup,
     parse_simples,
 )
+from ..domain.names import NameIndex, resolve_candidates
 from .companies import Lookups, upsert_company
+from .customer_import import link_customer
 
 BATCH = 1000
 
@@ -110,6 +112,12 @@ def import_receita_files(session: Session, files_dir: Path, filters: ImportFilte
     lookups = Lookups(session)
     ctx.info(f"Tabelas auxiliares: {stats['lookups']} registros")
 
+    # Clientes informados só pelo nome: procura a razão social no arquivo Empresas (pré-passagem)
+    name_matches, ambiguous = _match_customer_names(session, files["empresas"], ctx)
+    forced_basicos = set(name_matches.values())
+    stats["clientes_por_nome"] = len(name_matches)
+    stats["clientes_ambiguos"] = len(ambiguous)
+
     existing = set(session.scalars(select(Company.cnpj)).all())
     basicos: set[str] = set()
     batch: list[dict] = []
@@ -141,7 +149,8 @@ def import_receita_files(session: Session, files_dir: Path, filters: ImportFilte
                 if stats["invalid"] <= 50:
                     ctx.error(f"{path.name} linha {stats['read']}: {exc}")
                 continue
-            if rec["cnpj"] not in existing and not filters.accepts(rec):
+            forced = rec["is_matriz"] and rec["cnpj_basico"] in forced_basicos
+            if rec["cnpj"] not in existing and not forced and not filters.accepts(rec):
                 continue
             stats["accepted"] += 1
             basicos.add(rec["cnpj_basico"])
@@ -169,8 +178,49 @@ def import_receita_files(session: Session, files_dir: Path, filters: ImportFilte
                     stats[kind] += _apply_basico(session, pending, reference, lookups)
                     pending.clear()
             stats[kind] += _apply_basico(session, pending, reference, lookups)
+    _link_name_matches(session, name_matches, ambiguous)
     ctx.info(f"Importação concluída: {stats}")
     return stats
+
+
+def _match_customer_names(session: Session, empresas_files: list[Path], ctx
+                          ) -> tuple[dict[int, str], set[int]]:
+    pending = {c.id: c.razao_social for c in session.scalars(select(Customer).where(
+        Customer.cnpj.is_(None), Customer.status.in_(["sem_cnpj", "ambiguo"]))).all()
+        if c.razao_social}
+    index = NameIndex(pending)
+    if not index or not empresas_files:
+        return {}, set()
+    ctx.info(f"Procurando {len(pending)} cliente(s) sem CNPJ pela razão social no arquivo Empresas")
+    candidates: dict[int, set[str]] = {}
+    for path in empresas_files:
+        for row in iter_rows(path):
+            if len(row) < 2:
+                continue
+            hit = index.match(row[1])
+            if hit:
+                candidates.setdefault(hit[0], set()).add(row[0].strip().zfill(8))
+    unique, ambiguous = resolve_candidates(candidates)
+    ctx.info(f"Razão social encontrada: {len(unique)} cliente(s); ambíguos: {len(ambiguous)}; "
+             f"não encontrados: {len(pending) - len(unique) - len(ambiguous)}")
+    return unique, ambiguous
+
+
+def _link_name_matches(session: Session, matches: dict[int, str], ambiguous: set[int]) -> None:
+    for cid, basico in matches.items():
+        customer = session.get(Customer, cid)
+        company = session.scalar(select(Company).where(
+            Company.cnpj_basico == basico, Company.is_matriz.is_(True)))
+        if customer is not None and company is not None:
+            link_customer(customer, company, "nome_receita",
+                          "Vinculado pela razão social nos dados da Receita — confira se é a "
+                          "empresa correta")
+    for cid in ambiguous:
+        customer = session.get(Customer, cid)
+        if customer is not None and customer.company_id is None:
+            customer.status = "ambiguo"
+            customer.match_note = "Mais de uma empresa com esta razão social — informe o CNPJ"
+    session.commit()
 
 
 def _apply_basico(session: Session, pending: dict[str, dict], reference: str,

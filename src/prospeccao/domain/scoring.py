@@ -65,6 +65,7 @@ class Profile:
     """Perfil agregado dos clientes atuais (serializável em JSON)."""
 
     n: int = 0
+    n_cnae: int = 0  # clientes com CNAE conhecido (os demais contribuem só com nome/UF)
     cnae: dict[int, Counter] = field(default_factory=lambda: {k: Counter() for k, *_ in _CNAE_LEVELS})
     segment: Counter = field(default_factory=Counter)
     uf: Counter = field(default_factory=Counter)
@@ -78,6 +79,7 @@ class Profile:
         for c in customers:
             p.n += 1
             if c.cnae_principal:
+                p.n_cnae += 1
                 for level, *_ in _CNAE_LEVELS:
                     p.cnae[level][c.cnae_principal[:level]] += 1
             if c.segment:
@@ -99,6 +101,7 @@ class Profile:
     def to_dict(self) -> dict:
         return {
             "n": self.n,
+            "n_cnae": self.n_cnae,
             "cnae": {str(k): dict(v) for k, v in self.cnae.items()},
             "segment": dict(self.segment),
             "uf": dict(self.uf),
@@ -113,6 +116,7 @@ class Profile:
         if not d:
             return p
         p.n = int(d.get("n", 0))
+        p.n_cnae = int(d.get("n_cnae", 0))
         for k, v in (d.get("cnae") or {}).items():
             p.cnae[int(k)] = Counter(v)
         p.segment = Counter(d.get("segment") or {})
@@ -198,10 +202,25 @@ def similarity(profile: Profile, c: CompanyFeatures, weights: dict[str, float]) 
                   if porte_value else "Porte diferente ou não informado")
     criteria.append(("porte", "Porte semelhante", porte_value, porte_text))
 
+    # Critérios sem nenhum dado na base de clientes (ex.: planilha só com nomes, sem CNAE/UF)
+    # não podem ser avaliados: seu peso é redistribuído entre os demais, de forma explícita.
+    available = {
+        "cnae": bool(profile.cnae[2]), "segmento": bool(profile.segment),
+        "palavras": bool(profile.top_keywords()), "localizacao": bool(profile.uf),
+        "porte": bool(profile.porte),
+    }
+    missing = [k for k, ok in available.items() if not ok]
+    if missing and len(missing) < len(available):
+        total = sum(w[k] for k in available if available[k])
+        w = {k: (w[k] / total if available[k] else 0.0) for k in w}
+        criteria = [(k, label, value if available[k] else 0.0,
+                     text if available[k] else "Sem este dado na base de clientes — critério não avaliado")
+                    for k, label, value, text in criteria]
     score = sum(w[key] * value for key, _, value, _ in criteria)
     return {
         "score": round(100 * score, 1),
         "similar_customers": similar,
+        "unavailable": missing,
         "criteria": [
             {"key": key, "label": label, "value": round(value, 3), "weight": round(w[key], 3),
              "points": round(100 * w[key] * value, 1), "explanation": text}

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .names import expand_abbreviations
 from .text import norm
 
 # Segmentos padrão. Os prefixos referem-se à CNAE 2.3 (subclasses de 7 dígitos). São um ponto de
@@ -23,25 +24,29 @@ DEFAULT_SEGMENTS: list[dict] = [
         "name": "Instaladores",
         "description": "Instalações elétricas e outras instalações prediais",
         "cnae_prefixes": ["4321", "4322", "4329"],
-        "keywords": ["instalacoes eletricas", "instaladora", "eletricista", "instalacao eletrica"],
+        "keywords": ["instalacoes eletricas", "instaladora", "eletricista", "instalacao eletrica",
+                     "eletrica", "eletricidade", "refrigeracao", "climatizacao", "ar condicionado",
+                     "instalacoes"],
     },
     {
         "name": "Distribuidores",
         "description": "Comércio atacadista (material elétrico, construção, máquinas)",
         "cnae_prefixes": ["4673", "4679", "4663", "4669", "4674", "4684", "46"],
-        "keywords": ["distribuidora", "distribuidor", "atacado"],
+        "keywords": ["distribuidora", "distribuidor", "atacado", "atacadista", "suprimentos"],
     },
     {
         "name": "Varejo",
         "description": "Comércio varejista de material elétrico, ferragens e construção",
         "cnae_prefixes": ["4742", "4744", "4743", "4789", "47"],
-        "keywords": ["materiais eletricos", "material eletrico", "home center", "loja"],
+        "keywords": ["materiais eletricos", "material eletrico", "home center", "loja",
+                     "ferragens", "materiais de construcao"],
     },
     {
         "name": "Energia",
         "description": "Geração, transmissão, distribuição de energia e redes elétricas",
         "cnae_prefixes": ["35", "4221902", "4221901", "4221905"],
-        "keywords": ["energia", "subestacao", "eletrificacao", "transmissao"],
+        "keywords": ["energia", "energy", "subestacao", "eletrificacao", "transmissao",
+                     "geracao"],
     },
     {
         "name": "Telecomunicações",
@@ -59,7 +64,9 @@ DEFAULT_SEGMENTS: list[dict] = [
         "name": "Construção Civil",
         "description": "Construção de edifícios e serviços especializados de construção",
         "cnae_prefixes": ["41", "43"],
-        "keywords": ["construtora", "construcoes", "incorporadora", "engenharia civil"],
+        "keywords": ["construtora", "construcoes", "construcao", "incorporadora", "incorporacao",
+                     "engenharia civil", "empreendimentos", "empreendimento", "imobiliario",
+                     "imobiliaria", "edificacoes"],
     },
     {
         "name": "Engenharia",
@@ -71,7 +78,8 @@ DEFAULT_SEGMENTS: list[dict] = [
         "name": "Automação",
         "description": "Automação industrial, instrumentação e controle",
         "cnae_prefixes": ["2651", "3321", "2790", "3313"],
-        "keywords": ["automacao", "instrumentacao", "controle industrial", "paineis eletricos"],
+        "keywords": ["automacao", "instrumentacao", "controle industrial", "paineis eletricos",
+                     "paineis"],
     },
     {
         "name": "Integradores",
@@ -84,7 +92,9 @@ DEFAULT_SEGMENTS: list[dict] = [
         "name": "Fabricantes",
         "description": "Fabricação de materiais, máquinas e equipamentos elétricos/eletrônicos",
         "cnae_prefixes": ["27", "26", "28", "29", "30"],
-        "keywords": ["fabricante", "fabrica", "manufatura"],
+        "keywords": ["fabricante", "fabrica", "manufatura", "iluminacao", "eletrotecnica",
+                     "eletromecanica", "componentes", "eletronicos", "eletronica", "cabos",
+                     "transformadores"],
     },
     {
         "name": "Agrobusiness",
@@ -92,13 +102,15 @@ DEFAULT_SEGMENTS: list[dict] = [
         "cnae_prefixes": ["01", "02", "03", "4623", "4661", "4683", "1011", "1012", "1061",
                           "1071", "1081"],
         "keywords": ["agro", "agricola", "agropecuaria", "fazenda", "irrigacao", "cooperativa",
-                     "agronegocio", "armazens", "silos"],
+                     "agronegocio", "armazens", "silos", "agroindustrial", "agropecuario",
+                     "cerealista", "sementes", "graos", "usina"],
     },
     {
         "name": "Indústria",
         "description": "Demais atividades industriais (seções B e C da CNAE)",
         "cnae_prefixes": [str(i).zfill(2) for i in range(5, 34)],
-        "keywords": ["industria", "industrial", "metalurgica"],
+        "keywords": ["industria", "industrial", "metalurgica", "maquinas", "equipamentos",
+                     "industrias"],
     },
     {
         "name": "Outros",
@@ -157,7 +169,7 @@ def classify(
     text: str | None = None,
 ) -> Classification:
     secondary_cnaes = secondary_cnaes or []
-    normalized_text = f" {norm(text)} "
+    normalized_text = f" {expand_abbreviations(text)} "
     fallback = next((r for r in rules if r.is_fallback), None)
     best: tuple[float, SegmentRule, str, str] | None = None
 

@@ -254,3 +254,43 @@ def test_parse_does_not_confuse_words_with_uf():
 
 def test_parse_mato_grosso_do_sul_before_mato_grosso():
     assert query_parser.parse("agro em mato grosso do sul").uf == "MS"
+
+
+# ---------------------------------------------------------------- base só com nomes
+
+
+def test_similarity_redistributes_weights_when_profile_lacks_data():
+    # perfil vindo de lista só de nomes: há segmento (por palavra-chave) e palavras, sem CNAE/UF/porte
+    profile = scoring.Profile.build([
+        scoring.CompanyFeatures(None, [], "Instaladores", None, None, "instalacoes eletricas alfa"),
+        scoring.CompanyFeatures(None, [], None, None, None, "eletricas beta instalacoes"),
+    ])
+    r = scoring.similarity(profile, scoring.CompanyFeatures(
+        "4321500", [], "Instaladores", "SP", "01", "instalacoes eletricas gama"), {})
+    assert set(r["unavailable"]) == {"cnae", "localizacao", "porte"}
+    by = {c["key"]: c for c in r["criteria"]}
+    assert by["cnae"]["weight"] == 0 and "não avaliado" in by["cnae"]["explanation"]
+    assert abs(by["segmento"]["weight"] + by["palavras"]["weight"] - 1) < 1e-3
+    assert r["score"] > 60  # não fica artificialmente limitado pelos critérios sem dados
+
+
+def test_name_keys_and_abbreviations():
+    from prospeccao.domain.names import NameIndex, expand_abbreviations, looks_truncated, name_key
+
+    assert name_key("ALFABEV S.A.") == name_key("Alfabev S/A") == "alfabev"
+    assert name_key("BETACABOS IND BRASILEIRA DE MATS ELET. EIRELI - EPP") == \
+        name_key("Betacabos Indústria Brasileira de Materiais Elétricos EIRELI")
+    assert looks_truncated("OMEGA MERCADO DE COMPONENTES ELETRONICOS L")
+    assert not looks_truncated("GAMA ILUMINAÇÃO LTDA")
+    idx = NameIndex({1: "OMEGA MERCADO DE COMPONENTES ELETRONICOS L", 2: "ALFABEV S.A."})
+    assert idx.match("OMEGA MERCADO DE COMPONENTES ELETRONICOS LTDA") == (1, "nome_prefixo")
+    assert idx.match("ALFABEV S/A") == (2, "nome_exato")
+    assert idx.match("ALFABEV PARTICIPACOES LTDA") is None  # nome curto não casa por prefixo
+    assert expand_abbreviations("DELTAMIX COM DE MAT ELETRICOS") == \
+        "deltamix comercio de materiais eletricos"
+
+
+def test_classify_name_with_erp_abbreviations(rules):
+    assert classify(rules, None, [], "DELTAMIX COM DE MAT ELETRICOS LTDA").segment_name == "Varejo"
+    assert classify(rules, None, [], "ALFA EMPREENDIMENTOS IMOBILIARIOS").segment_name == \
+        "Construção Civil"

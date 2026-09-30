@@ -48,7 +48,7 @@ def test_every_api_route_is_protected(app):
             url = path.replace("{company_id}", "1").replace("{lead_id}", "1") \
                 .replace("{note_id}", "1").replace("{info_id}", "1").replace("{job_id}", "1") \
                 .replace("{segment_id}", "1").replace("{status_id}", "1") \
-                .replace("{contact_id}", "1")
+                .replace("{contact_id}", "1").replace("{customer_id}", "1")
             for method in route.methods - {"HEAD", "OPTIONS"}:
                 assert c.request(method, url).status_code == 401, f"{method} {path}"
 
@@ -416,3 +416,20 @@ def test_delete_contact_lgpd(make_app):
         after = c.get(f"/api/companies/{d['id']}").json()
         assert not after["contatos"] and after["tem_telefone"] is False
         assert c.delete(f"/api/contacts/{tel['id']}").status_code == 404
+
+
+def test_customer_manual_cnpj(client, db):
+    from prospeccao.models import Customer
+
+    r = client.post("/api/customers/import", files={"file": (
+        "c.csv", "Cliente que já tiveram cotação\nALFA LTDA\nBETA LTDA\n".encode(), "text/csv")})
+    assert r.json()["status"] == "done", r.json()["log"]
+    alfa, beta = db.scalars(select(Customer).order_by(Customer.id)).all()
+    cnpj = make_cnpj("13131313")
+    assert client.patch(f"/api/customers/{alfa.id}", json={"cnpj": "123"}).status_code == 422
+    ok = client.patch(f"/api/customers/{alfa.id}", json={"cnpj": cnpj}).json()
+    assert ok["status"] == "nao_encontrado" and ok["cnpj"] == cnpj  # fora da base local ainda
+    assert client.patch(f"/api/customers/{beta.id}", json={"cnpj": cnpj}).status_code == 409
+    assert client.patch("/api/customers/999", json={"cnpj": cnpj}).status_code == 404
+    page = client.get("/clientes?status=sem_cnpj")
+    assert page.status_code == 200 and "BETA LTDA" in page.text and "ALFA LTDA" not in page.text

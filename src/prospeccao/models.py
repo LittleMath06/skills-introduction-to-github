@@ -220,8 +220,13 @@ class Customer(Base):
     segmento_informado: Mapped[str | None] = mapped_column(String(120))
     porte: Mapped[str | None] = mapped_column(String(2))
     raw: Mapped[dict | None] = mapped_column(JSON)
-    # ok | sem_cnpj | nao_encontrado
+    # Chave do nome (domain.names.name_key) — deduplica e localiza clientes informados só pelo nome
+    name_key: Mapped[str | None] = mapped_column(String(255), index=True)
+    # ok | sem_cnpj (só nome, aguardando identificação) | ambiguo | nao_encontrado
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="ok")
+    # cnpj | nome_exato | nome_prefixo | manual — como o vínculo com a empresa foi feito
+    match_method: Mapped[str | None] = mapped_column(String(20))
+    match_note: Mapped[str | None] = mapped_column(String(255))
     company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id", ondelete="SET NULL"))
     import_batch: Mapped[str] = mapped_column(String(40), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)

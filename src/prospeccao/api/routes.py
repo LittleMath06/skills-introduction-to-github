@@ -345,10 +345,40 @@ def list_customers(page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, 
     rows = db.scalars(stmt.order_by(Customer.id).offset((page - 1) * page_size).limit(page_size)).all()
     return {"items": [{"id": c.id, "cnpj": c.cnpj, "razao_social": c.razao_social, "uf": c.uf,
                        "municipio": c.municipio, "cnae": c.cnae, "segmento_informado":
-                       c.segmento_informado, "status": c.status, "company_id": c.company_id}
+                       c.segmento_informado, "status": c.status, "company_id": c.company_id,
+                       "vinculo": c.match_method, "observacao": c.match_note}
                       for c in rows],
             "total": total, "page": page, "page_size": page_size,
             "pages": max(1, -(-total // page_size))}
+
+
+class CustomerPatch(BaseModel):
+    cnpj: str = Field(..., max_length=20)
+
+
+@router.patch("/customers/{customer_id}", summary="Informa/corrige o CNPJ de um cliente")
+def patch_customer(customer_id: int, body: CustomerPatch, request: Request,
+                   db: Session = Depends(get_db)):
+    customer = db.get(Customer, customer_id)
+    if customer is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Cliente não encontrado")
+    if not cnpj_mod.is_valid(body.cnpj):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "CNPJ inválido")
+    cnpj = cnpj_mod.clean(body.cnpj)
+    other = db.scalar(select(Customer).where(Customer.cnpj == cnpj, Customer.id != customer.id))
+    if other is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            f"Este CNPJ já pertence ao cliente '{other.razao_social or other.id}'")
+    customer.cnpj = cnpj
+    company = db.scalar(select(Company).where(Company.cnpj == cnpj))
+    customer.company_id = company.id if company else None
+    customer.status = "ok" if company else "nao_encontrado"
+    customer.match_method = "manual"
+    customer.match_note = None if company else "CNPJ informado; empresa ainda não está na base local"
+    db.commit()
+    job = _runner(request).submit(db, "rescore", {}, task_rescore)
+    return {"id": customer.id, "cnpj": customer.cnpj, "status": customer.status,
+            "company_id": customer.company_id, "job": ser.job(job)}
 
 
 @router.get("/profile", summary="Perfil de cliente ideal calculado")

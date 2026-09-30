@@ -14,7 +14,7 @@ from prospeccao.services.jobs import JobRunner
 from prospeccao.services.receita_import import ImportFilters, import_receita_files
 from prospeccao.services.tasks import task_import_receita
 
-from .conftest import FakeSources, est_row, make_cnpj, write_zip
+from .conftest import FakeSources, emp_row, est_row, make_cnpj, write_zip
 
 
 class Ctx:
@@ -149,7 +149,8 @@ def test_customer_import_csv_validation_and_dedup(db):
     # reimportação atualiza em vez de duplicar
     rep2 = import_customers(db, "clientes.csv", content)
     db.commit()
-    assert rep2.imported == 1 and rep2.updated == 2  # linha sem CNPJ não tem chave → nova
+    assert rep2.imported == 0 and rep2.updated == 3  # sem CNPJ: deduplicado pelo nome
+    assert db.scalar(select(func.count(Customer.id))) == 3
     assert db.scalar(select(func.count(Customer.id)).where(Customer.cnpj.is_not(None))) == 2
 
 
@@ -220,3 +221,92 @@ def test_receita_duplicate_row_in_same_file(db, tmp_path):
     stats = import_receita_files(db, d, ImportFilters(set(), ("4321",), True), "x", Ctx())
     assert stats["created"] == 1 and stats["updated"] == 1
     assert db.scalar(select(Company).where(Company.cnpj == c)).nome_fantasia == "SEGUNDA"
+
+
+# ---------------------------------------------------------------- clientes informados só pelo nome
+# (mesmo formato da planilha real: 1 coluna "Clientes que já tiveram cotação"; nomes fictícios)
+
+
+def _names_xlsx(names: list[str]) -> bytes:
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["Cliente que já tiveram cotação"])
+    for n in names:
+        ws.append([n])
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def test_name_only_list_import_and_dedup(db):
+    content = _names_xlsx(["ELETRICA TESTE INSTALACOES LTDA", "Elétrica Teste Instalações Ltda.",
+                           "DISTRIBUIDORA TESTE DE MATERIAIS ELETRICOS LTDA", "  ", "AGRO FICTICIA S/A"])
+    rep = import_customers(db, "clientes.xlsx", content)
+    db.commit()
+    assert rep.columns == {"razao_social": "Cliente que já tiveram cotação"}
+    assert rep.total_rows == 4 and rep.imported == 3 and rep.duplicates_in_file == 1
+    assert rep.without_cnpj == 3 and rep.ignored_empty == 1
+    assert {c.status for c in db.scalars(select(Customer))} == {"sem_cnpj"}
+    rep2 = import_customers(db, "clientes.xlsx", content)
+    db.commit()
+    assert rep2.imported == 0 and db.scalar(select(func.count(Customer.id))) == 3
+
+
+def test_name_only_customers_matched_in_receita_files(db, receita_dir):
+    d, c = receita_dir
+    import_customers(db, "c.xlsx", _names_xlsx([
+        "ELETRICA TESTE INSTALACOES LTDA",                     # exato
+        "DISTRIBUIDORA TESTE DE MATERIAIS ELETRICOS L",        # truncado pelo ERP
+        "EMPRESA QUE NAO EXISTE NA RECEITA LTDA",
+    ]))
+    db.commit()
+    ctx = Ctx()
+    # filtro de CNAE que NÃO inclui as empresas: elas entram por serem clientes identificados
+    stats = import_receita_files(db, d, ImportFilters(set(), ("0115",), True), "2026-09", ctx)
+    assert stats["clientes_por_nome"] == 2
+    by_name = {cu.razao_social: cu for cu in db.scalars(select(Customer))}
+    exact = by_name["ELETRICA TESTE INSTALACOES LTDA"]
+    assert exact.status == "ok" and exact.cnpj == c["c1"] and exact.match_method == "nome_receita"
+    assert exact.company.is_matriz  # vincula à matriz, não à filial
+    trunc = by_name["DISTRIBUIDORA TESTE DE MATERIAIS ELETRICOS L"]
+    assert trunc.cnpj == c["c2"]
+    assert by_name["EMPRESA QUE NAO EXISTE NA RECEITA LTDA"].status == "sem_cnpj"
+
+
+def test_name_match_ambiguous_is_not_linked(db, tmp_path):
+    d = tmp_path / "amb"
+    d.mkdir()
+    a, b = make_cnpj("12121212"), make_cnpj("34343434")
+    write_zip(d / "Estabelecimentos0.zip", "ESTABELE", [est_row(a), est_row(b)])
+    write_zip(d / "Empresas0.zip", "EMPRE", [emp_row("12121212", "HOMONIMA LTDA"),
+                                              emp_row("34343434", "HOMONIMA EIRELI")])
+    import_customers(db, "c.xlsx", _names_xlsx(["Homônima Ltda"]))
+    db.commit()
+    import_receita_files(db, d, ImportFilters(set(), ("0115",), True), "x", Ctx())
+    cu = db.scalar(select(Customer))
+    assert cu.status == "ambiguo" and cu.company_id is None and "CNPJ" in cu.match_note
+
+
+def test_name_only_relink_against_local_base(db, receita_dir):
+    from prospeccao.services.customer_import import relink_customers
+
+    d, c = receita_dir
+    import_receita_files(db, d, ImportFilters(set(), ("4321", "4673"), True), "2026-09", Ctx())
+    import_customers(db, "c.xlsx", _names_xlsx(["Elétrica Teste Instalações Ltda."]))
+    db.commit()
+    assert relink_customers(db) == 1
+    cu = db.scalar(select(Customer))
+    assert cu.cnpj == c["c1"] and cu.match_method == "nome_exato"
+
+
+def test_reimport_with_cnpj_upgrades_name_only_customer(db):
+    import_customers(db, "c.xlsx", _names_xlsx(["ALFA INSTALACOES LTDA", "BETA LTDA"]))
+    db.commit()
+    c = make_cnpj("14141414")
+    rep = import_customers(db, "c.csv", _csv(["Razão social;CNPJ;UF",
+                                              f"Alfa Instalações Ltda.;{c};GO"]))
+    db.commit()
+    assert rep.imported == 0 and rep.updated == 1
+    rows = {cu.razao_social: cu for cu in db.scalars(select(Customer))}
+    assert len(rows) == 2 and rows["Alfa Instalações Ltda."].cnpj == c
+    assert rows["Alfa Instalações Ltda."].uf == "GO" and rows["Alfa Instalações Ltda."].status == "nao_encontrado"

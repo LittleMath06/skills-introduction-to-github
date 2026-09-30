@@ -37,17 +37,19 @@
   <section class="card">
     <h2>Perfil de cliente ideal</h2>
     {% if profile and profile.n %}
-      <p class="muted"><small>Calculado a partir de {{ profile.n }} cliente(s){% if profile_at %} em {{ profile_at[:16].replace('T', ' ') }}{% endif %}. Padrões encontrados na base:</small></p>
+      <p class="muted"><small>Calculado a partir de {{ profile.n }} cliente(s) — {{ profile.n_cnae or 0 }} com CNAE conhecido, {{ profile.n - (profile.n_cnae or 0) }} apenas pelo nome{% if profile_at %} em {{ profile_at[:16].replace('T', ' ') }}{% endif %}. Padrões encontrados na base:</small></p>
       {% for title, key in [('Segmentos', 'segment'), ('Estados', 'uf'), ('Regiões', 'region')] %}
         <h3>{{ title }}</h3>
         {% set data = profile[key] %}{% set mx = (data.values()|max) if data else 1 %}
-        <ul class="bars">{% for k, v in data|dictsort(by='value', reverse=true) %}{% if loop.index <= 8 %}<li><span>{{ k }}</span><span class="bar"><i data-width="{{ (100 * v / mx)|round(1) }}"></i></span><span>{{ v }}</span></li>{% endif %}{% endfor %}</ul>
+        <ul class="bars">{% for k, v in data|dictsort(by='value', reverse=true) %}{% if loop.index <= 8 %}<li><span>{{ k }}</span><span class="bar"><i data-width="{{ (100 * v / mx)|round(1) }}"></i></span><span>{{ v }}</span></li>{% endif %}{% else %}<li class="muted"><small>Sem este dado na planilha — será preenchido quando os CNPJs forem identificados.</small></li>{% endfor %}</ul>
+        {% if key == 'segment' and data and not profile.n_cnae %}<small class="muted">Segmentos <span class="badge est">estimados</span> pelas palavras do nome; clientes sem palavra de atividade no nome ficam sem segmento.</small>{% endif %}
       {% endfor %}
       <h3>CNAEs (classe) mais comuns</h3>
       {% set data = profile.cnae['5'] if profile.cnae and '5' in profile.cnae else {} %}
-      <ul>{% for k, v in data|dictsort(by='value', reverse=true) %}{% if loop.index <= 8 %}<li><span class="mono">{{ k[:4] }}-{{ k[4:] }}</span> · {{ v }} cliente(s)</li>{% endif %}{% endfor %}</ul>
+      <ul>{% for k, v in data|dictsort(by='value', reverse=true) %}{% if loop.index <= 8 %}<li><span class="mono">{{ k[:4] }}-{{ k[4:] }}</span> · {{ v }} cliente(s)</li>{% endif %}{% else %}<li class="muted"><small>Nenhum cliente com CNAE conhecido ainda.</small></li>{% endfor %}</ul>
       <h3>Porte</h3>
-      <div class="row">{% for k, v in profile.porte|dictsort(by='value', reverse=true) %}<span class="chip">{{ PORTE_LABELS.get(k, k) }}: {{ v }}</span>{% endfor %}</div>
+      <div class="row">{% for k, v in profile.porte|dictsort(by='value', reverse=true) %}<span class="chip">{{ PORTE_LABELS.get(k, k) }}: {{ v }}</span>{% else %}<small class="muted">Sem este dado na planilha.</small>{% endfor %}</div>
+      {% if not profile.n_cnae %}<p class="notice warn"><small>Enquanto nenhum CNPJ de cliente for identificado, a compatibilidade usa apenas <strong>segmento e palavras do nome</strong>; os critérios CNAE, localização e porte ficam "não avaliados" e seus pesos são redistribuídos.</small></p>{% endif %}
       <h3>Palavras-chave</h3>
       <div class="row">{% for k, v in profile.keywords|dictsort(by='value', reverse=true) %}{% if loop.index <= 25 %}<span class="chip">{{ k }} · {{ v }}</span>{% endif %}{% endfor %}</div>
     {% else %}
@@ -57,9 +59,10 @@
 </div>
 
 <section class="card">
-  <div class="row"><h2>Clientes ({{ total }})</h2><span class="spacer"></span>{% for k, v in by_status.items() %}<span class="chip">{{ {'ok': 'vinculados', 'sem_cnpj': 'sem CNPJ', 'nao_encontrado': 'não encontrados'}.get(k, k) }}: {{ v }}</span>{% endfor %}</div>
+  <div class="row"><h2>Clientes ({{ total }})</h2><span class="spacer"></span>{% for k, v in by_status.items() %}<a class="chip" href="?status={{ k }}">{{ STATUS_LABELS.get(k, k) }}: {{ v }}</a>{% endfor %}{% if status_filter %}<a class="chip" href="/clientes">todos ×</a>{% endif %}</div>
+  {% if by_status.get('sem_cnpj') or by_status.get('ambiguo') %}<p class="notice warn"><small>{{ (by_status.get('sem_cnpj', 0) + by_status.get('ambiguo', 0)) }} cliente(s) estão identificados só pelo nome. O sistema procura a razão social na base local (ao recalcular) e nos arquivos da Receita (na próxima importação). Você também pode informar o CNPJ na última coluna. Enquanto isso, esses clientes contribuem para o perfil apenas com as palavras do nome.</small></p>{% endif %}
   <table class="responsive">
-    <thead><tr><th>CNPJ</th><th>Razão social</th><th>Cidade/UF</th><th>CNAE</th><th>Segmento informado</th><th>Situação</th></tr></thead>
+    <thead><tr><th>CNPJ</th><th>Razão social</th><th>Cidade/UF</th><th>CNAE</th><th>Segmento informado</th><th>Situação</th><th>Informar CNPJ</th></tr></thead>
     <tbody>
     {% for cu in customers %}
       <tr>
@@ -68,11 +71,14 @@
         <td data-label="Cidade/UF">{{ cu.municipio or '—' }}/{{ cu.uf or '—' }}</td>
         <td data-label="CNAE" class="mono">{{ cu.cnae|cnae if cu.cnae else '—' }}</td>
         <td data-label="Segmento informado">{{ cu.segmento_informado or '—' }}</td>
-        <td data-label="Situação"><span class="badge {{ 'ok' if cu.status == 'ok' else 'warn' }}">{{ {'ok': 'vinculado', 'sem_cnpj': 'sem CNPJ', 'nao_encontrado': 'não encontrado'}.get(cu.status, cu.status) }}</span></td>
+        <td data-label="Situação"><span class="badge {{ 'ok' if cu.status == 'ok' else 'warn' }}">{{ STATUS_LABELS.get(cu.status, cu.status) }}</span>
+          {% if cu.match_method and cu.match_method != 'cnpj' %}<br><small class="muted">{{ METHOD_LABELS.get(cu.match_method, cu.match_method) }}</small>{% endif %}
+          {% if cu.match_note %}<br><small class="muted">{{ cu.match_note }}</small>{% endif %}</td>
+        <td data-label="Informar CNPJ"><form class="row inline-form" data-form="customer-cnpj" data-id="{{ cu.id }}"><input type="text" name="cnpj" maxlength="20" placeholder="00.000.000/0000-00" aria-label="CNPJ de {{ cu.razao_social }}"><button class="btn-sm" type="submit">Salvar</button></form></td>
       </tr>
-    {% else %}<tr><td colspan="6" class="muted">Nenhum cliente importado.</td></tr>{% endfor %}
+    {% else %}<tr><td colspan="7" class="muted">Nenhum cliente importado.</td></tr>{% endfor %}
     </tbody>
   </table>
-  {% if pages > 1 %}<nav class="pager">{% for p in range(1, pages + 1) %}{% if p == page %}<span class="cur">{{ p }}</span>{% elif p <= 3 or p > pages - 3 or (p - page)|abs <= 2 %}<a href="?page={{ p }}">{{ p }}</a>{% endif %}{% endfor %}</nav>{% endif %}
+  {% if pages > 1 %}<nav class="pager">{% for p in range(1, pages + 1) %}{% if p == page %}<span class="cur">{{ p }}</span>{% elif p <= 3 or p > pages - 3 or (p - page)|abs <= 2 %}<a href="?page={{ p }}{% if status_filter %}&status={{ status_filter }}{% endif %}">{{ p }}</a>{% endif %}{% endfor %}</nav>{% endif %}
 </section>
 {% endblock %}

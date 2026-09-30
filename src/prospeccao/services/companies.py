@@ -271,11 +271,15 @@ def rebuild_profile(session: Session, ctx: ScoringContext | None = None) -> scor
         if company is not None:
             classify_company(company, ctx)
             features.append(features_of(company, ctx.segment_names.get(company.segment_id)))
-        elif customer.cnae or customer.uf:
+        elif customer.cnae or customer.uf or customer.razao_social:
             seg = classify(ctx.rules, customer.cnae, [], customer.razao_social)
             informed = customer.segmento_informado
-            seg_name = next((n for n in ctx.segment_ids if norm(n) == norm(informed)), seg.segment_name) \
-                if informed else seg.segment_name
+            if informed:
+                seg_name = next((n for n in ctx.segment_ids if norm(n) == norm(informed)),
+                                seg.segment_name)
+            else:
+                # só o nome e nenhuma palavra-chave reconhecida: não "inventa" o segmento
+                seg_name = None if seg.method == "fallback" else seg.segment_name
             features.append(scoring.CompanyFeatures(
                 cnae_principal=customer.cnae, segment=seg_name, uf=customer.uf,
                 porte=customer.porte, text=" ".join(filter(None, [customer.razao_social,

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import ValidationError
@@ -165,11 +165,25 @@ def leads_page(request: Request, db: Session = Depends(get_db), status_id: int |
                   view=view, status_id=status_id)
 
 
+CUSTOMER_STATUS_LABELS = {"ok": "vinculado", "sem_cnpj": "só nome (sem CNPJ)",
+                          "ambiguo": "nome ambíguo", "nao_encontrado": "CNPJ fora da base"}
+CUSTOMER_METHOD_LABELS = {"nome_exato": "vinculado pelo nome (base local)",
+                          "nome_prefixo": "vinculado pelo início do nome (base local)",
+                          "nome_receita": "vinculado pelo nome (dados da Receita)",
+                          "manual": "CNPJ informado por você"}
+
+
 @protected.get("/clientes")
-def customers_page(request: Request, db: Session = Depends(get_db), page: int = 1):
+def customers_page(request: Request, db: Session = Depends(get_db), page: int = 1,
+                   status_filter: str | None = Query(None, alias="status")):
     page = max(1, min(page, 10_000))
-    total = db.scalar(select(func.count(Customer.id))) or 0
-    rows = db.scalars(select(Customer).order_by(Customer.id).offset((page - 1) * 50).limit(50)).all()
+    base = select(Customer)
+    if status_filter in CUSTOMER_STATUS_LABELS:
+        base = base.where(Customer.status == status_filter)
+    else:
+        status_filter = None
+    total = db.scalar(select(func.count()).select_from(base.subquery())) or 0
+    rows = db.scalars(base.order_by(Customer.id).offset((page - 1) * 50).limit(50)).all()
     by_status = dict(db.execute(select(Customer.status, func.count(Customer.id))
                                 .group_by(Customer.status)).all())
     last_import = db.scalar(select(Job).where(Job.kind == "import_customers")
@@ -178,7 +192,8 @@ def customers_page(request: Request, db: Session = Depends(get_db), page: int = 
                   pages=max(1, -(-total // 50)), by_status=by_status,
                   profile=settings_store.get(db, "customer_profile"),
                   profile_at=settings_store.get(db, "customer_profile_built_at"),
-                  last_import=last_import)
+                  last_import=last_import, status_filter=status_filter,
+                  STATUS_LABELS=CUSTOMER_STATUS_LABELS, METHOD_LABELS=CUSTOMER_METHOD_LABELS)
 
 
 @protected.get("/configuracoes")

@@ -60,3 +60,9 @@ dist/
 *.p12
 *.key
 deploy/backups/
+
+# Planilhas/exportações com dados de clientes nunca vão para o Git
+*.xlsx
+*.xlsm
+*.xls
+*.csv

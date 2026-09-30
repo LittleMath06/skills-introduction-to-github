@@ -168,6 +168,10 @@
     try {
       if (kind === "note") {
         await api("POST", "/api/leads/" + form.dataset.lead + "/notes", { text: fd.get("text") }); toast("Observação adicionada"); reload();
+      } else if (kind === "customer-cnpj") {
+        const r = await api("PATCH", "/api/customers/" + form.dataset.id, { cnpj: fd.get("cnpj") });
+        toast(r.status === "ok" ? "Cliente vinculado — recalculando perfil" : "CNPJ salvo; a empresa entrará na base na próxima importação/consulta");
+        reload(800);
       } else if (kind === "website") {
         await api("PATCH", "/api/companies/" + form.dataset.id, { website: fd.get("website") || "" }); toast("Site salvo"); reload();
       } else if (kind === "fiscal") {
