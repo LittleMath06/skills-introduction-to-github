@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Configurações{% endblock %}
+{% block content %}
+<h1>Configurações</h1>
+<form class="card stack" data-form="weights">
+  <h2>Pesos dos critérios</h2>
+  <p class="muted"><small>Os pesos são normalizados para somar 100%. Ao salvar, todas as empresas são recalculadas em segundo plano.</small></p>
+  <div class="grid grid-3">
+    <div>
+      <h3>Compatibilidade</h3>
+      {% for k in sim_keys %}<div><label for="sim-{{ k }}">{{ {'cnae': 'CNAE', 'segmento': 'Segmento', 'palavras': 'Palavras-chave/atividade', 'localizacao': 'Localização', 'porte': 'Porte'}[k] }}</label><input id="sim-{{ k }}" type="number" step="0.01" min="0" max="1" name="similarity.{{ k }}" value="{{ '%.2f'|format(sim[k]) }}"></div>{% endfor %}
+    </div>
+    <div>
+      <h3>Potencial</h3>
+      {% for k in pot_keys %}<div><label for="pot-{{ k }}">{{ {'compatibilidade': 'Compatibilidade', 'afinidade_segmento': 'Afinidade do segmento', 'completude': 'Completude dos dados', 'maturidade': 'Maturidade (idade)'}[k] }}</label><input id="pot-{{ k }}" type="number" step="0.01" min="0" max="1" name="potential.{{ k }}" value="{{ '%.2f'|format(pot[k]) }}"></div>{% endfor %}
+    </div>
+    <div>
+      <h3>Afinidade do segmento com cabos</h3>
+      <p class="muted"><small>Premissa comercial (0 a 1). Ajuste conforme sua experiência.</small></p>
+      {% for name, v in affinity|dictsort %}<div><label for="aff-{{ loop.index }}">{{ name }}</label><input id="aff-{{ loop.index }}" type="number" step="0.05" min="0" max="1" name="segment_affinity.{{ name }}" value="{{ '%.2f'|format(v) }}"></div>{% endfor %}
+    </div>
+  </div>
+  <button class="btn-primary" type="submit">Salvar pesos e recalcular</button>
+</form>
+
+<section class="card stack">
+  <h2>Segmentos</h2>
+  <p class="muted"><small>Prefixos de CNAE (2 a 7 dígitos, separados por vírgula) e palavras-chave (sem acento). O prefixo mais específico vence; palavras-chave complementam.</small></p>
+  <table class="responsive">
+    <thead><tr><th>Nome</th><th>Prefixos CNAE</th><th>Palavras-chave</th><th>Ativo</th><th></th></tr></thead>
+    <tbody>
+    {% for s in segments %}
+      <tr data-segment-row="{{ s.id }}">
+        <td data-label="Nome"><input type="text" name="name" value="{{ s.name }}" maxlength="80" {{ 'readonly' if s.is_fallback }}></td>
+        <td data-label="Prefixos CNAE"><input type="text" name="cnae_prefixes" value="{{ s.cnae_prefixes }}" maxlength="2000"></td>
+        <td data-label="Palavras-chave"><input type="text" name="keywords" value="{{ s.keywords }}" maxlength="2000"></td>
+        <td data-label="Ativo"><input type="checkbox" name="active" {{ 'checked' if s.active }} aria-label="Ativo"></td>
+        <td><button class="btn-sm" data-action="save-segment" data-id="{{ s.id }}">Salvar</button></td>
+      </tr>
+    {% endfor %}
+      <tr data-segment-row="new">
+        <td data-label="Nome"><input type="text" name="name" placeholder="Novo segmento" maxlength="80"></td>
+        <td data-label="Prefixos CNAE"><input type="text" name="cnae_prefixes" placeholder="ex.: 4321,4329" maxlength="2000"></td>
+        <td data-label="Palavras-chave"><input type="text" name="keywords" placeholder="ex.: eletrica,instalacao" maxlength="2000"></td>
+        <td data-label="Ativo"><input type="checkbox" name="active" checked aria-label="Ativo"></td>
+        <td><button class="btn-sm" data-action="save-segment" data-id="new">Adicionar</button></td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="card stack">
+  <h2>Status comerciais</h2>
+  <table class="responsive">
+    <thead><tr><th>Nome</th><th>Ordem</th><th>Final</th><th></th></tr></thead>
+    <tbody>
+    {% for s in statuses %}
+      <tr data-status-row="{{ s.id }}"><td data-label="Nome"><input type="text" name="name" value="{{ s.name }}" maxlength="60"></td><td data-label="Ordem"><input type="number" name="position" value="{{ s.position }}" min="0" max="1000"></td><td data-label="Final"><input type="checkbox" name="is_final" {{ 'checked' if s.is_final }} aria-label="Final"></td><td><button class="btn-sm" data-action="save-status" data-id="{{ s.id }}">Salvar</button></td></tr>
+    {% endfor %}
+      <tr data-status-row="new"><td data-label="Nome"><input type="text" name="name" placeholder="Novo status" maxlength="60"></td><td data-label="Ordem"><input type="number" name="position" value="{{ statuses|length }}" min="0" max="1000"></td><td data-label="Final"><input type="checkbox" name="is_final" aria-label="Final"></td><td><button class="btn-sm" data-action="save-status" data-id="new">Adicionar</button></td></tr>
+    </tbody>
+  </table>
+</section>
+{% endblock %}

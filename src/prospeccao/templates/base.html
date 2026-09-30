@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf }}">
+  <meta name="robots" content="noindex, nofollow">
+  <title>{% block title %}Prospecção{% endblock %} · Prospecção de Clientes</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+{% block body %}
+<header class="topbar">
+  <div class="inner">
+    <a class="brand" href="/"><span class="dot"></span><span class="t">Prospecção</span></a>
+    <nav class="nav">
+      {% set items = [("/", "Início"), ("/buscar", "Buscar"), ("/leads", "Leads"), ("/clientes", "Clientes"), ("/configuracoes", "Configurações"), ("/administracao", "Administração"), ("/metodologia", "Metodologia")] %}
+      {% for href, label in items %}
+      <a href="{{ href }}" class="{{ 'active' if (path == href or (href != '/' and path.startswith(href)) or (href == '/buscar' and path.startswith('/empresas'))) }}">{{ label }}</a>
+      {% endfor %}
+    </nav>
+    <form method="post" action="/logout"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="logout btn-sm" type="submit">Sair</button></form>
+  </div>
+</header>
+{% if mock_active %}
+<div class="mock-banner">MOCK — existem dados fictícios de desenvolvimento na base. Eles não representam empresas reais.</div>
+{% endif %}
+<main>
+{% block content %}{% endblock %}
+</main>
+{% endblock %}
+<div id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

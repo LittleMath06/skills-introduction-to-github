@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Erro {{ code }}{% endblock %}
+{% block content %}
+<div class="card stack">
+  <h1>{{ 'Não encontrado' if code == 404 else 'Não foi possível concluir' }}</h1>
+  <p>{{ message }}</p>
+  <p><a class="btn" href="/buscar">Voltar para a busca</a></p>
+</div>
+{% endblock %}

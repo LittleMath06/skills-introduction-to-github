@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Entrar{% endblock %}
+{% block body %}
+<div class="login-wrap">
+  <form class="card login stack" method="post" action="/login" autocomplete="on">
+    <div class="brand"><span class="dot"></span> Prospecção de Clientes</div>
+    <p class="muted">Acesso privado. Entre com seu usuário e senha.</p>
+    {% if error %}<div class="notice err" role="alert">{{ error }}</div>{% endif %}
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <div><label for="username">Usuário</label><input id="username" name="username" type="text" required maxlength="60" autocomplete="username" autofocus></div>
+    <div><label for="password">Senha</label><input id="password" name="password" type="password" required maxlength="200" autocomplete="current-password"></div>
+    <button class="btn-primary" type="submit">Entrar</button>
+  </form>
+</div>
+{% endblock %}

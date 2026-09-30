@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Clientes atuais{% endblock %}
+{% block content %}
+<h1>Base de clientes atuais</h1>
+<p class="muted">Dados privados, usados apenas para calcular o perfil de cliente ideal. Não são exibidos publicamente.</p>
+
+<div class="grid grid-2">
+  <section class="card stack">
+    <h2>Importar planilha</h2>
+    <p><small>Formatos: <strong>.xlsx</strong> ou <strong>.csv</strong> (até 20 MB). Colunas reconhecidas automaticamente: CNPJ, razão social, nome fantasia, cidade, UF, CNAE, segmento, porte. A importação valida os CNPJs, remove duplicidades e atualiza clientes já existentes.</small></p>
+    <form class="stack" data-form="import-customers" enctype="multipart/form-data">
+      <input type="file" name="file" accept=".csv,.xlsx,.xlsm,.txt" required aria-label="Arquivo da base de clientes">
+      <button class="btn-primary" type="submit">Importar</button>
+    </form>
+    <div data-job-panel {% if last_import %}data-job-id="{{ last_import.id }}"{% endif %}></div>
+    {% if last_import and last_import.params and last_import.params.report %}{% set rep = last_import.params.report %}
+    <h3>Última importação</h3>
+    <dl class="kv">
+      <dt>Linhas lidas</dt><dd>{{ rep.total_rows }}</dd>
+      <dt>Novos / atualizados</dt><dd>{{ rep.imported }} / {{ rep.updated }}</dd>
+      <dt>Duplicados no arquivo</dt><dd>{{ rep.duplicates_in_file }}</dd>
+      <dt>CNPJ inválido</dt><dd>{{ rep.invalid_cnpj_count }}{% for i in rep.invalid_cnpj[:10] %}<div><small>linha {{ i.linha }}: {{ i.valor }}</small></div>{% endfor %}</dd>
+      <dt>Sem CNPJ</dt><dd>{{ rep.without_cnpj }}</dd>
+      <dt>Vinculados à base</dt><dd>{{ rep.linked }}</dd>
+      <dt>Não encontrados</dt><dd>{{ rep.not_found }}</dd>
+      <dt>Colunas usadas</dt><dd>{% for k, v in rep.columns.items() %}<span class="chip">{{ k }} ← {{ v }}</span> {% endfor %}</dd>
+      {% if rep.unmapped_columns %}<dt>Colunas ignoradas</dt><dd><small>{{ rep.unmapped_columns|join(', ') }}</small></dd>{% endif %}
+    </dl>
+    {% endif %}
+    {% if by_status.get('nao_encontrado') %}
+    <div class="notice warn">{{ by_status.nao_encontrado }} cliente(s) não estão na base local de empresas.
+      <button class="btn-sm" data-action="admin" data-endpoint="/api/admin/lookup-customers">Consultar na API pública (1 por vez, respeitando limites)</button>
+      ou importe os dados da Receita em <a href="/administracao">Administração</a>.</div>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2>Perfil de cliente ideal</h2>
+    {% if profile and profile.n %}
+      <p class="muted"><small>Calculado a partir de {{ profile.n }} cliente(s){% if profile_at %} em {{ profile_at[:16].replace('T', ' ') }}{% endif %}. Padrões encontrados na base:</small></p>
+      {% for title, key in [('Segmentos', 'segment'), ('Estados', 'uf'), ('Regiões', 'region')] %}
+        <h3>{{ title }}</h3>
+        {% set data = profile[key] %}{% set mx = (data.values()|max) if data else 1 %}
+        <ul class="bars">{% for k, v in data|dictsort(by='value', reverse=true) %}{% if loop.index <= 8 %}<li><span>{{ k }}</span><span class="bar"><i data-width="{{ (100 * v / mx)|round(1) }}"></i></span><span>{{ v }}</span></li>{% endif %}{% endfor %}</ul>
+      {% endfor %}
+      <h3>CNAEs (classe) mais comuns</h3>
+      {% set data = profile.cnae['5'] if profile.cnae and '5' in profile.cnae else {} %}
+      <ul>{% for k, v in data|dictsort(by='value', reverse=true) %}{% if loop.index <= 8 %}<li><span class="mono">{{ k[:4] }}-{{ k[4:] }}</span> · {{ v }} cliente(s)</li>{% endif %}{% endfor %}</ul>
+      <h3>Porte</h3>
+      <div class="row">{% for k, v in profile.porte|dictsort(by='value', reverse=true) %}<span class="chip">{{ PORTE_LABELS.get(k, k) }}: {{ v }}</span>{% endfor %}</div>
+      <h3>Palavras-chave</h3>
+      <div class="row">{% for k, v in profile.keywords|dictsort(by='value', reverse=true) %}{% if loop.index <= 25 %}<span class="chip">{{ k }} · {{ v }}</span>{% endif %}{% endfor %}</div>
+    {% else %}
+      <p class="muted">Ainda não há clientes importados.</p>
+    {% endif %}
+  </section>
+</div>
+
+<section class="card">
+  <div class="row"><h2>Clientes ({{ total }})</h2><span class="spacer"></span>{% for k, v in by_status.items() %}<span class="chip">{{ {'ok': 'vinculados', 'sem_cnpj': 'sem CNPJ', 'nao_encontrado': 'não encontrados'}.get(k, k) }}: {{ v }}</span>{% endfor %}</div>
+  <table class="responsive">
+    <thead><tr><th>CNPJ</th><th>Razão social</th><th>Cidade/UF</th><th>CNAE</th><th>Segmento informado</th><th>Situação</th></tr></thead>
+    <tbody>
+    {% for cu in customers %}
+      <tr>
+        <td data-label="CNPJ" class="mono">{% if cu.company_id %}<a href="/empresas/{{ cu.company_id }}">{{ cu.cnpj|cnpj }}</a>{% else %}{{ cu.cnpj|cnpj if cu.cnpj else '—' }}{% endif %}</td>
+        <td data-label="Razão social">{{ cu.razao_social or '—' }}</td>
+        <td data-label="Cidade/UF">{{ cu.municipio or '—' }}/{{ cu.uf or '—' }}</td>
+        <td data-label="CNAE" class="mono">{{ cu.cnae|cnae if cu.cnae else '—' }}</td>
+        <td data-label="Segmento informado">{{ cu.segmento_informado or '—' }}</td>
+        <td data-label="Situação"><span class="badge {{ 'ok' if cu.status == 'ok' else 'warn' }}">{{ {'ok': 'vinculado', 'sem_cnpj': 'sem CNPJ', 'nao_encontrado': 'não encontrado'}.get(cu.status, cu.status) }}</span></td>
+      </tr>
+    {% else %}<tr><td colspan="6" class="muted">Nenhum cliente importado.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+  {% if pages > 1 %}<nav class="pager">{% for p in range(1, pages + 1) %}{% if p == page %}<span class="cur">{{ p }}</span>{% elif p <= 3 or p > pages - 3 or (p - page)|abs <= 2 %}<a href="?page={{ p }}">{{ p }}</a>{% endif %}{% endfor %}</nav>{% endif %}
+</section>
+{% endblock %}

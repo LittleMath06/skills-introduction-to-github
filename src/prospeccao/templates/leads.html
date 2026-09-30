@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% from "_macros.html" import pager, score_cls %}
+{% block title %}Leads{% endblock %}
+{% block content %}
+<h1>Leads salvos</h1>
+<nav class="tabs">
+  {% for key, label in [('ativos', 'Ativos'), ('favoritos', 'Favoritos'), ('analisados', 'Analisados'), ('descartados', 'Descartados')] %}
+  <a href="/leads?view={{ key }}" class="{{ 'active' if view == key }}">{{ label }}</a>
+  {% endfor %}
+</nav>
+<form class="row" method="get" action="/leads">
+  <input type="hidden" name="view" value="{{ view }}">
+  <label for="st" class="muted">Status:</label>
+  <select id="st" name="status_id" data-autosubmit><option value="">Todos</option>{% for s in statuses %}<option value="{{ s.id }}" {{ 'selected' if status_id == s.id }}>{{ s.name }}</option>{% endfor %}</select>
+  <noscript><button type="submit">Filtrar</button></noscript>
+  <span class="spacer"></span><strong>{{ r.total }} lead(s)</strong>
+</form>
+<section class="card">
+  <table class="responsive">
+    <thead><tr><th>Empresa</th><th>Cidade/UF</th><th>Compat.</th><th>Potencial</th><th>Status</th><th>Marcadores</th><th>Última observação</th></tr></thead>
+    <tbody>
+    {% for l in r['items'] %}{% set c = l.company %}
+      <tr>
+        <td data-label="Empresa"><a href="/empresas/{{ c.id }}">{{ c.display_name }}</a>{% if c.is_mock %} <span class="badge mock">MOCK</span>{% endif %}<br><small class="mono muted">{{ c.cnpj|cnpj }}</small></td>
+        <td data-label="Cidade/UF">{{ c.municipio }}/{{ c.uf }}</td>
+        <td data-label="Compat."><strong>{{ c.similarity|round|int }}%</strong></td>
+        <td data-label="Potencial"><strong>{{ c.potential|round|int }}</strong></td>
+        <td data-label="Status"><select data-action="lead-status" data-lead="{{ l.id }}" aria-label="Status">{% for s in statuses %}<option value="{{ s.id }}" {{ 'selected' if s.id == l.status_id }}>{{ s.name }}</option>{% endfor %}</select></td>
+        <td data-label="Marcadores">
+          <button class="btn-sm {{ 'on' if l.favorite }}" data-action="lead-toggle" data-lead="{{ l.id }}" data-field="favorite" data-value="{{ 'false' if l.favorite else 'true' }}">★</button>
+          <button class="btn-sm {{ 'on' if l.analyzed }}" data-action="lead-toggle" data-lead="{{ l.id }}" data-field="analyzed" data-value="{{ 'false' if l.analyzed else 'true' }}">Analisado</button>
+          <button class="btn-sm" data-action="lead-toggle" data-lead="{{ l.id }}" data-field="discarded" data-value="{{ 'false' if l.discarded else 'true' }}">{{ 'Restaurar' if l.discarded else 'Descartar' }}</button>
+        </td>
+        <td data-label="Última observação"><small>{{ l.notes[0].text[:120] if l.notes else '—' }}</small></td>
+      </tr>
+    {% else %}<tr><td colspan="7" class="muted">Nenhum lead nesta visão. Salve empresas a partir da <a href="/buscar">busca</a>.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</section>
+{{ pager(r, {'view': view, 'status_id': status_id or ''}) }}
+{% endblock %}

@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% from "_macros.html" import company_row, score_cls %}
+{% block title %}Início{% endblock %}
+{% block content %}
+<div class="row"><h1>Olá{% if user %}, {{ user.username|capitalize }}{% endif %}</h1><span class="spacer"></span>
+  <a class="btn" href="/buscar?sort=similarity&lead_state=novos">Ver novos leads compatíveis</a></div>
+
+<section class="kpis">
+  <div class="kpi"><div class="v">{{ '{:,}'.format(d.total_companies).replace(',', '.') }}</div><div class="l">Empresas na base</div></div>
+  <div class="kpi"><div class="v">{{ '{:,}'.format(d.active_prospects).replace(',', '.') }}</div><div class="l">Prospects ativos (não clientes)</div></div>
+  <div class="kpi"><div class="v">{{ '{:,}'.format(d.new_last_30d).replace(',', '.') }}</div><div class="l">Novos leads (30 dias)</div></div>
+  <div class="kpi"><div class="v">{{ d.saved_leads }}</div><div class="l">Leads salvos</div></div>
+  <div class="kpi"><div class="v">{{ d.customers }}</div><div class="l">Clientes na base ({{ d.customers_linked }} vinculados)</div></div>
+</section>
+
+<form class="card search-hero" method="get" action="/buscar" role="search">
+  <input type="search" name="nl" placeholder='Pesquise livremente: "instaladores em Minas Gerais", "agronegócio no Centro-Oeste", "semelhantes aos meus clientes"' aria-label="Pesquisa livre">
+  <button class="btn-primary" type="submit">Pesquisar</button>
+</form>
+
+{% if not d.profile or not d.profile.n %}
+<div class="notice warn">Importe a base de clientes atuais em <a href="/clientes">Clientes</a> para ativar a compatibilidade com o perfil.</div>
+{% endif %}
+{% if d.total_companies == 0 %}
+<div class="notice">A base de empresas está vazia. Importe os dados abertos do CNPJ em <a href="/administracao">Administração</a> ou consulte um CNPJ em <a href="/buscar">Buscar</a>.</div>
+{% endif %}
+{% for j in d.running_jobs %}
+<div class="notice" data-job="{{ j.id }}">Processo em andamento: <strong>{{ j.kind }}</strong> — <span data-job-text>{{ j.processed }}{% if j.total %} / {{ j.total }}{% endif %}</span> <progress data-job-progress max="{{ j.total or 1 }}" value="{{ j.processed }}"></progress></div>
+{% endfor %}
+
+<div class="grid grid-2" >
+  <section class="card">
+    <div class="row"><h2>Maior compatibilidade</h2><span class="spacer"></span><a href="/buscar?sort=similarity">ver todos</a></div>
+    {% if d.top_similarity %}
+    <ul class="results">{% for c in d.top_similarity %}{{ company_row(c, []) }}{% endfor %}</ul>
+    {% else %}<p class="muted">Nenhuma empresa ativa ainda.</p>{% endif %}
+  </section>
+  <div class="stack">
+    <section class="card">
+      <h2>Prospects ativos por região</h2>
+      {% set mx = (d.by_region|map(attribute='count')|max) if d.by_region else 1 %}
+      <ul class="bars">{% for r in d.by_region %}<li><a href="/buscar?region={{ r.label|urlencode }}">{{ r.label }}</a><span class="bar navy"><i data-width="{{ (100 * r.count / mx)|round(1) }}"></i></span><span>{{ r.count }}</span></li>{% else %}<li class="muted">Sem dados</li>{% endfor %}</ul>
+    </section>
+    <section class="card">
+      <h2>Por segmento <span class="badge est">estimado</span></h2>
+      {% set mx = (d.by_segment|map(attribute='count')|max) if d.by_segment else 1 %}
+      <ul class="bars">{% for r in d.by_segment %}<li><a href="/buscar?segment={{ r.label|urlencode }}">{{ r.label }}</a><span class="bar"><i data-width="{{ (100 * r.count / mx)|round(1) }}"></i></span><span>{{ r.count }}</span></li>{% else %}<li class="muted">Sem dados</li>{% endfor %}</ul>
+    </section>
+    <section class="card">
+      <h2>Por estado</h2>
+      <div class="row">{% for r in d.by_uf %}<a class="chip" href="/buscar?uf={{ r.label }}">{{ r.label }} · {{ r.count }}</a>{% else %}<span class="muted">Sem dados</span>{% endfor %}</div>
+    </section>
+  </div>
+</div>
+
+<div class="grid grid-2" >
+  <section class="card">
+    <h2>Atualizadas recentemente</h2>
+    <table class="responsive"><thead><tr><th>Empresa</th><th>UF</th><th>Atualização</th></tr></thead><tbody>
+    {% for c in d.recently_updated %}<tr><td data-label="Empresa"><a href="/empresas/{{ c.id }}">{{ c.display_name }}</a></td><td data-label="UF">{{ c.uf }}</td><td data-label="Atualização">{{ c.updated_at.strftime('%d/%m/%Y %H:%M') }}</td></tr>
+    {% else %}<tr><td colspan="3" class="muted">Nada ainda.</td></tr>{% endfor %}
+    </tbody></table>
+  </section>
+  <section class="card">
+    <div class="row"><h2>Status das fontes de dados</h2><span class="spacer"></span><a href="/administracao">detalhes</a></div>
+    <table><tbody>{% for s in d.sources %}<tr><td><span class="dot-level {{ s.level }}"></span>{{ s.source.name }}</td><td class="muted">{{ s.message }}</td></tr>{% endfor %}</tbody></table>
+  </section>
+</div>
+{% endblock %}

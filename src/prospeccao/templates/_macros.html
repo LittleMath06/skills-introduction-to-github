@@ -1,0 +1,73 @@
+{% macro score_cls(v) %}{{ 'hi' if v >= 70 else ('mid' if v >= 40 else 'lo') }}{% endmacro %}
+
+{% macro avatar(c, cls='') -%}
+<div class="avatar {{ cls }}" aria-hidden="true">
+  {%- if c.logo_url and c.website_status in ('verificado', 'manual') -%}
+  <img src="{{ c.logo_url }}" alt="" loading="lazy" referrerpolicy="no-referrer" data-fallback="{{ (c.display_name|replace('[MOCK] ', ''))[:2]|upper }}">
+  {%- else -%}{{ (c.display_name|replace('[MOCK] ', ''))[:2]|upper }}{%- endif -%}
+</div>
+{%- endmacro %}
+
+{% macro maps_url(c) -%}
+https://www.openstreetmap.org/search?query={{ ([c.logradouro, c.numero, c.municipio, c.uf, 'Brasil']|select|join(', '))|urlencode }}
+{%- endmacro %}
+
+{% macro company_row(c, statuses) %}
+<li class="result" data-company="{{ c.id }}">
+  {{ avatar(c) }}
+  <div>
+    <div class="name"><a href="/empresas/{{ c.id }}">{{ c.nome_fantasia or c.razao_social or c.cnpj }}</a>
+      {% if c.is_mock %}<span class="badge mock">MOCK</span>{% endif %}
+      {% if not c.is_matriz %}<span class="badge">Filial</span>{% endif %}
+      {% if c.customer_group and not c.is_customer %}<span class="badge info" title="Outro estabelecimento do mesmo grupo já é cliente">Grupo já atendido</span>{% endif %}
+      {% if c.is_customer %}<span class="badge ok">Cliente atual</span>{% endif %}
+      {% if c.lead %}<span class="badge {{ 'err' if c.lead.discarded else 'info' }}">{{ 'Descartado' if c.lead.discarded else 'Lead: ' ~ c.lead.status.name }}</span>{% endif %}
+    </div>
+    <div class="meta">
+      {% if c.nome_fantasia and c.razao_social %}<span>{{ c.razao_social }}</span>{% endif %}
+      <span class="mono">{{ c.cnpj|cnpj }}</span>
+      <span>{{ c.municipio or '—' }}/{{ c.uf or '—' }}</span>
+    </div>
+    <div class="meta">
+      <span>{% if c.segment %}{{ c.segment.name }}{% if c.segment_method != 'manual' %} <span class="badge est" title="Classificação estimada: {{ c.segment_explanation }}">estimado</span>{% endif %}{% else %}Sem segmento{% endif %}</span>
+      <span title="{{ c.cnae_principal_desc or '' }}">CNAE {{ c.cnae_principal|cnae }}</span>
+      <span class="badge {{ 'ok' if c.situacao_cadastral == '02' else 'err' }}">{{ SITUACAO_LABELS.get(c.situacao_cadastral, c.situacao_cadastral or '—') }}</span>
+      <span class="badge {{ 'ok' if c.icms_status.startswith('confirmado_h') else ('warn' if c.icms_status == 'provavel' else '') }}">{{ ICMS_LABELS.get(c.icms_status) }}</span>
+      <span class="icons"><span class="{{ 'yes' if c.has_phone }}" title="Telefone">tel</span><span class="{{ 'yes' if c.has_email }}" title="E-mail">e-mail</span><span class="{{ 'yes' if c.has_website }}" title="Site">site</span></span>
+      <span>atualizado {{ c.updated_at.strftime('%d/%m/%Y') }}</span>
+    </div>
+    <div class="actions">
+      <a class="btn btn-sm" href="/empresas/{{ c.id }}">Detalhes</a>
+      {% if not c.lead %}
+      <button class="btn-sm" data-action="save-lead" data-id="{{ c.id }}">Salvar lead</button>
+      {% else %}
+      <button class="btn-sm {{ 'on' if c.lead.favorite }}" data-action="lead-toggle" data-lead="{{ c.lead.id }}" data-field="favorite" data-value="{{ 'false' if c.lead.favorite else 'true' }}">★ Favorito</button>
+      <button class="btn-sm {{ 'on' if c.lead.analyzed }}" data-action="lead-toggle" data-lead="{{ c.lead.id }}" data-field="analyzed" data-value="{{ 'false' if c.lead.analyzed else 'true' }}">Analisado</button>
+      {% endif %}
+      {% if not (c.lead and c.lead.discarded) %}
+      <button class="btn-sm" data-action="discard" data-id="{{ c.id }}" {% if c.lead %}data-lead="{{ c.lead.id }}"{% endif %}>Descartar</button>
+      {% endif %}
+      {% if c.website %}<a class="btn btn-sm" href="{{ c.website }}" target="_blank" rel="noopener noreferrer">Site</a>{% endif %}
+      {% if c.municipio %}<a class="btn btn-sm" href="{{ maps_url(c) }}" target="_blank" rel="noopener noreferrer">Mapa</a>{% endif %}
+    </div>
+  </div>
+  <div class="scores">
+    <div class="score {{ score_cls(c.similarity) }}" title="Compatibilidade estimada com o perfil dos clientes atuais"><div class="v">{{ c.similarity|round|int }}%</div><div class="l">compat.</div></div>
+    <div class="score {{ score_cls(c.potential) }}" title="Potencial estimado (metodologia em /metodologia)"><div class="v">{{ c.potential|round|int }}</div><div class="l">potencial</div></div>
+  </div>
+</li>
+{% endmacro %}
+
+{% macro pager(r, base_query, key='page') %}
+{% if r.pages > 1 %}
+<nav class="pager" aria-label="Paginação">
+  {% set q = base_query.copy() %}
+  {% if r.page > 1 %}{% set _ = q.update({key: r.page - 1}) %}<a href="?{{ q|urlencode }}">« Anterior</a>{% endif %}
+  {% for p in range([1, r.page - 2]|max, [r.pages, r.page + 2]|min + 1) %}
+    {% set _ = q.update({key: p}) %}
+    {% if p == r.page %}<span class="cur">{{ p }}</span>{% else %}<a href="?{{ q|urlencode }}">{{ p }}</a>{% endif %}
+  {% endfor %}
+  {% if r.page < r.pages %}{% set _ = q.update({key: r.page + 1}) %}<a href="?{{ q|urlencode }}">Próxima »</a>{% endif %}
+</nav>
+{% endif %}
+{% endmacro %}

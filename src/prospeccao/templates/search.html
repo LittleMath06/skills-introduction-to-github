@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% from "_macros.html" import company_row, pager %}
+{% block title %}Buscar{% endblock %}
+{% block content %}
+<h1>Buscar empresas</h1>
+
+<form class="card stack" method="get" action="/buscar" role="search" id="search-form">
+  <div class="search-hero">
+    <input type="search" name="nl" value="{{ query.get('nl', '') }}" maxlength="300" placeholder='Pesquisa livre: "empresas de engenharia elétrica em São Paulo"' aria-label="Pesquisa livre">
+    <button class="btn-primary" type="submit">Pesquisar</button>
+  </div>
+  {% if r and r.interpreted %}
+  <div class="row"><small>Interpretado como:</small>
+    {% for k, v in r.interpreted.items() %}{% if k != 'sort' %}<span class="chip">{{ {'segment': 'Segmento', 'uf': 'UF', 'region': 'Região', 'city': 'Cidade', 'q': 'Termos', 'min_similarity': 'Compat. ≥'}[k] }}: {{ v }}</span>{% endif %}{% endfor %}
+    <small class="muted">(os itens abaixo já foram aplicados aos filtros e podem ser removidos)</small>
+  </div>
+  {% endif %}
+  <details class="filters-box" {{ 'open' if query|length > 0 and not query.get('nl') else '' }}>
+    <summary>Filtros</summary>
+    <div class="filters">
+      <div class="field"><label for="f-q">Termos ou CNPJ</label><input id="f-q" type="text" name="q" value="{{ f.q or '' }}" maxlength="200"></div>
+      <div class="field"><label for="f-region">Região</label><select id="f-region" name="region"><option value="">Todas</option>{% for r in REGIONS %}<option {{ 'selected' if f.region == r }}>{{ r }}</option>{% endfor %}</select></div>
+      <div class="field"><label for="f-uf">UF</label><select id="f-uf" name="uf"><option value="">Todas</option>{% for u in UFS %}<option value="{{ u }}" {{ 'selected' if f.uf == u }}>{{ u }} — {{ UF_NAMES[u] }}</option>{% endfor %}</select></div>
+      <div class="field"><label for="f-city">Cidade</label><input id="f-city" type="text" name="city" value="{{ f.city or '' }}" maxlength="120"></div>
+      <div class="field"><label for="f-seg">Segmento</label><select id="f-seg" name="segment"><option value="">Todos</option>{% for s in segments %}<option {{ 'selected' if f.segment == s.name }}>{{ s.name }}</option>{% endfor %}</select></div>
+      <div class="field"><label for="f-cnae">CNAE (prefixo)</label><input id="f-cnae" type="text" name="cnae" value="{{ f.cnae or '' }}" maxlength="9" placeholder="ex.: 4321"></div>
+      <div class="field"><label for="f-porte">Porte</label><select id="f-porte" name="porte"><option value="">Todos</option>{% for k, v in PORTE_LABELS.items() %}<option value="{{ k }}" {{ 'selected' if f.porte == k }}>{{ v }}</option>{% endfor %}</select></div>
+      <div class="field"><label for="f-sit">Situação cadastral</label><select id="f-sit" name="situacao"><option value="">Todas</option>{% for k, v in SITUACAO_LABELS.items() %}<option value="{{ k }}" {{ 'selected' if f.situacao == k }}>{{ v }}</option>{% endfor %}</select></div>
+      <div class="field"><label for="f-icms">ICMS</label><select id="f-icms" name="icms"><option value="">Todos</option><option value="contribuinte" {{ 'selected' if f.icms == 'contribuinte' }}>Contribuinte (confirmado ou provável)</option>{% for k, v in ICMS_LABELS.items() %}<option value="{{ k }}" {{ 'selected' if f.icms == k }}>{{ v }}</option>{% endfor %}</select></div>
+      {% for name, label, val in [('has_site', 'Site', f.has_site), ('has_phone', 'Telefone', f.has_phone), ('has_email', 'E-mail', f.has_email)] %}
+      <div class="field"><label for="f-{{ name }}">{{ label }}</label><select id="f-{{ name }}" name="{{ name }}"><option value="">Indiferente</option><option value="true" {{ 'selected' if val == true }}>Possui</option><option value="false" {{ 'selected' if val == false }}>Não possui</option></select></div>
+      {% endfor %}
+      <div class="field"><label for="f-sim">Compatibilidade mínima (%)</label><input id="f-sim" type="number" name="min_similarity" min="0" max="100" value="{{ f.min_similarity if f.min_similarity is not none else '' }}"></div>
+      <div class="field"><label for="f-pot">Potencial mínimo</label><input id="f-pot" type="number" name="min_potential" min="0" max="100" value="{{ f.min_potential if f.min_potential is not none else '' }}"></div>
+      <div class="field"><label for="f-upd">Atualizado desde</label><input id="f-upd" type="date" name="updated_since" value="{{ f.updated_since or '' }}"></div>
+      <div class="field"><label for="f-lead">Leads</label><select id="f-lead" name="lead_state">{% for k, v in [('todos', 'Todos (exceto descartados)'), ('novos', 'Somente não salvos'), ('salvos', 'Salvos'), ('favoritos', 'Favoritos'), ('analisados', 'Analisados'), ('descartados', 'Descartados')] %}<option value="{{ k }}" {{ 'selected' if f.lead_state == k }}>{{ v }}</option>{% endfor %}</select></div>
+      <div class="field"><label for="f-sort">Ordenar por</label><select id="f-sort" name="sort">{% for k, v in SORTS.items() %}<option value="{{ k }}" {{ 'selected' if f.sort == k }}>{{ v }}</option>{% endfor %}</select></div>
+      <div class="field"><label for="f-cust">Clientes atuais</label><select id="f-cust" name="include_customers"><option value="false">Ocultar</option><option value="true" {{ 'selected' if f.include_customers }}>Incluir</option></select></div>
+    </div>
+    <div class="row"><button class="btn-primary" type="submit">Aplicar filtros</button><a class="btn" href="/buscar">Limpar</a></div>
+  </details>
+</form>
+
+<section class="card">
+  <form class="row inline-form" data-form="lookup">
+    <label for="lookup-cnpj" class="muted">Não achou? Consulte um CNPJ específico na fonte pública:</label>
+    <input id="lookup-cnpj" name="cnpj" type="text" maxlength="20" placeholder="00.000.000/0000-00" required>
+    <button type="submit">Consultar CNPJ</button>
+  </form>
+</section>
+
+{% if error %}<div class="notice err" role="alert">Filtro inválido: {{ error }}</div>{% endif %}
+
+{% if r %}
+<div class="row">
+  <strong>{{ '{:,}'.format(r.total).replace(',', '.') }} empresa(s) encontrada(s)</strong>
+  {% set labels = {'q': 'Termos', 'region': 'Região', 'uf': 'UF', 'city': 'Cidade', 'segment': 'Segmento', 'cnae': 'CNAE', 'porte': 'Porte', 'situacao': 'Situação', 'icms': 'ICMS', 'has_site': 'Site', 'has_phone': 'Telefone', 'has_email': 'E-mail', 'min_similarity': 'Compat. ≥', 'min_potential': 'Potencial ≥', 'updated_since': 'Desde', 'lead_state': 'Leads', 'include_customers': 'Clientes'} %}
+  {% set fd = f.model_dump() %}
+  {% for key, label in labels.items() %}
+    {% set v = fd[key] %}
+    {% if v is not none and v != '' and not (key == 'lead_state' and v == 'todos') and not (key == 'include_customers' and not v) %}
+      {% set rest = {} %}
+      {% for k2 in labels %}{% if k2 != key and fd[k2] is not none and fd[k2] != '' %}{% set _ = rest.update({k2: fd[k2]}) %}{% endif %}{% endfor %}
+      {% if key == 'situacao' or fd['situacao'] is none %}{% set _ = rest.update({'situacao': ''}) %}{% endif %}
+      {% set _ = rest.update({'sort': f.sort}) %}
+      <span class="chip">{{ label }}: {{ SITUACAO_LABELS.get(v, v) if key == 'situacao' else (PORTE_LABELS.get(v, v) if key == 'porte' else ('sim' if v is sameas true else ('não' if v is sameas false else v))) }} <a href="/buscar?{{ rest|urlencode }}" aria-label="Remover filtro {{ label }}">×</a></span>
+    {% endif %}
+  {% endfor %}
+  <span class="spacer"></span><small class="muted">Ordenado por: {{ SORTS[f.sort] }}</small>
+</div>
+{% if r['items'] %}
+<ul class="results card">{% for c in r['items'] %}{{ company_row(c, statuses) }}{% endfor %}</ul>
+{% set base_q = {} %}{% for k, v in f.model_dump().items() %}{% if v is not none and v != '' and k not in ('page', 'nl') %}{% set _ = base_q.update({k: v}) %}{% endif %}{% endfor %}{% if f.situacao is none %}{% set _ = base_q.update({'situacao': ''}) %}{% endif %}
+{{ pager(r, base_q) }}
+{% else %}
+<div class="card"><p>Nenhuma empresa corresponde aos filtros. Remova algum filtro acima ou consulte um CNPJ específico.</p></div>
+{% endif %}
+<p class="muted"><small>Compatibilidade e potencial são <strong>estimativas</strong> baseadas nos critérios descritos em <a href="/metodologia">Metodologia</a>; não indicam que a empresa compra ou comprará cabos.</small></p>
+{% endif %}
+{% endblock %}

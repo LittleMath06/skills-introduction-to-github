@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Metodologia{% endblock %}
+{% block content %}
+<h1>Metodologia (transparência)</h1>
+<p class="notice">Todas as pontuações são <strong>estimativas</strong> calculadas por regras explícitas a partir dos dados disponíveis. Elas indicam <em>perfil compatível</em> e <em>indício de aderência</em>, nunca que uma empresa compra ou comprará cabos.</p>
+
+<div class="grid grid-2">
+  <section class="card">
+    <h2>Compatibilidade com o perfil atual (0–100%)</h2>
+    <p>O sistema monta um <strong>perfil de cliente ideal</strong> contando, na sua base de clientes, as ocorrências de cada CNAE (em 5 níveis: subclasse, classe, grupo, divisão), segmento, UF, região, porte e palavras-chave. Para cada empresa:</p>
+    <table><thead><tr><th>Critério</th><th>Peso atual</th><th>Como pontua (0 a 1)</th></tr></thead><tbody>
+      <tr><td>CNAE semelhante</td><td>{{ (sim.cnae * 100)|round|int }}%</td><td>mesma subclasse = 1; mesma classe = 0,85/0,7; mesmo grupo = 0,5; mesma divisão = 0,3. CNAE secundário vale 60%.</td></tr>
+      <tr><td>Segmento</td><td>{{ (sim.segmento * 100)|round|int }}%</td><td>frequência do segmento entre os clientes ÷ frequência do segmento mais comum ("Outros" vale metade).</td></tr>
+      <tr><td>Atividade relacionada</td><td>{{ (sim.palavras * 100)|round|int }}%</td><td>palavras em comum com as mais frequentes nos clientes (3 ou mais = 1).</td></tr>
+      <tr><td>Localização</td><td>{{ (sim.localizacao * 100)|round|int }}%</td><td>frequência da UF ÷ UF mais comum; se não houver clientes na UF, metade da mesma conta para a região.</td></tr>
+      <tr><td>Porte</td><td>{{ (sim.porte * 100)|round|int }}%</td><td>frequência do porte ÷ porte mais comum.</td></tr>
+    </tbody></table>
+    <p>Compatibilidade = Σ (peso × valor) × 100. Cada empresa mostra os pontos de cada critério e quantos clientes compartilham a atividade.</p>
+  </section>
+  <section class="card">
+    <h2>Potencial (0–100)</h2>
+    <table><thead><tr><th>Critério</th><th>Peso atual</th><th>Valor</th></tr></thead><tbody>
+      <tr><td>Compatibilidade</td><td>{{ (pot.compatibilidade * 100)|round|int }}%</td><td>compatibilidade ÷ 100</td></tr>
+      <tr><td>Afinidade do segmento</td><td>{{ (pot.afinidade_segmento * 100)|round|int }}%</td><td>premissa configurável por segmento (tabela abaixo)</td></tr>
+      <tr><td>Completude dos dados</td><td>{{ (pot.completude * 100)|round|int }}%</td><td>fração dos campos úteis preenchidos (telefone, e-mail e site pesam mais)</td></tr>
+      <tr><td>Maturidade</td><td>{{ (pot.maturidade * 100)|round|int }}%</td><td>&lt; 1 ano = 0,4; 1–3 anos = 0,7; ≥ 3 anos = 1; desconhecida = 0,5</td></tr>
+    </tbody></table>
+    <p>Empresas não ativas (baixada, inapta, suspensa, nula) têm potencial 0.</p>
+    <h3>Afinidade estimada por segmento</h3>
+    <div class="row">{% for k, v in affinity|dictsort %}<span class="chip">{{ k }}: {{ (v * 100)|round|int }}%</span>{% endfor %}</div>
+  </section>
+</div>
+
+<section class="card">
+  <h2>Classificação de segmento <span class="badge est">estimada</span></h2>
+  <p>1) O CNAE principal é comparado aos prefixos de cada segmento — vence o prefixo mais longo (mais específico); a confiança cresce com o tamanho do prefixo (2 dígitos = 60%, 4 = 82%, 7 = 92%). 2) CNAEs secundários valem metade. 3) Palavras-chave no nome/atividade somam bônus ou, sozinhas, classificam com confiança menor. 4) Sem sinais: "Outros" (20%). Você pode corrigir o segmento manualmente na página da empresa.</p>
+  <table class="responsive"><thead><tr><th>Segmento</th><th>Prefixos CNAE</th><th>Palavras-chave</th></tr></thead><tbody>
+  {% for s in segments %}<tr><td data-label="Segmento">{{ s.name }}</td><td data-label="Prefixos" class="mono"><small>{{ s.cnae_prefixes|replace(',', ', ') }}</small></td><td data-label="Palavras"><small>{{ s.keywords|replace(',', ', ') }}</small></td></tr>{% endfor %}
+  </tbody></table>
+</section>
+
+<section class="card">
+  <h2>Informações fiscais</h2>
+  <ul>
+    <li><span class="badge ok">Confirmado</span> {{ LEVELS.confirmado }} (ex.: Simples/MEI pelos dados abertos da Receita; IE/ICMS pela SEFAZ).</li>
+    <li><span class="badge warn">Provável</span> {{ LEVELS.provavel }} (ex.: contribuinte de ICMS inferido pelo CNAE de indústria/comércio).</li>
+    <li><span class="badge">Possível</span> {{ LEVELS.possivel }}</li>
+  </ul>
+  <p>Benefícios fiscais nunca são gerados automaticamente: só aparecem quando registrados com fonte.</p>
+</section>
+{% endblock %}

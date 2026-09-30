@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% from "_macros.html" import avatar, score_cls, maps_url %}
+{% block title %}{{ c.display_name }}{% endblock %}
+{% block content %}
+<section class="card">
+  <div class="row">
+    {{ avatar(c, 'lg') }}
+    <div>
+      <h1>{{ c.nome_fantasia or c.razao_social or c.cnpj }}
+        {% if c.is_mock %}<span class="badge mock">MOCK</span>{% endif %}
+        <span class="badge">{{ 'Matriz' if c.is_matriz else 'Filial' }}</span>
+        {% if c.is_customer %}<span class="badge ok">Cliente atual</span>{% elif c.customer_group %}<span class="badge info">Grupo já atendido</span>{% endif %}
+      </h1>
+      <div class="muted">{{ c.razao_social }} · <span class="mono">{{ c.cnpj|cnpj }}</span> ·
+        <span class="badge {{ 'ok' if c.situacao_cadastral == '02' else 'err' }}">{{ SITUACAO_LABELS.get(c.situacao_cadastral, '—') }}</span>
+      </div>
+      <div class="muted">Segmento: <strong>{{ c.segment.name if c.segment else '—' }}</strong>
+        {% if c.segment_method == 'manual' %}<span class="badge ok">definido manualmente</span>{% else %}<span class="badge est" title="{{ c.segment_explanation }}">estimado · confiança {{ ((c.segment_confidence or 0) * 100)|round|int }}%</span>{% endif %}
+      </div>
+    </div>
+    <span class="spacer"></span>
+    <div class="scores">
+      <div class="score {{ score_cls(c.similarity) }}"><div class="v">{{ c.similarity|round|int }}%</div><div class="l">compatibilidade</div></div>
+      <div class="score {{ score_cls(c.potential) }}"><div class="v">{{ c.potential|round|int }}</div><div class="l">potencial</div></div>
+      <div class="score {{ score_cls(c.completeness) }}"><div class="v">{{ c.completeness|round|int }}%</div><div class="l">completude</div></div>
+    </div>
+  </div>
+  <div class="row">
+    {% if not c.lead %}
+      <button class="btn-primary" data-action="save-lead" data-id="{{ c.id }}">Salvar como lead</button>
+    {% else %}
+      <label for="lead-status" class="muted">Status comercial:</label>
+      <select id="lead-status" data-action="lead-status" data-lead="{{ c.lead.id }}">{% for s in statuses %}<option value="{{ s.id }}" {{ 'selected' if s.id == c.lead.status_id }}>{{ s.name }}</option>{% endfor %}</select>
+      <button class="{{ 'on' if c.lead.favorite }}" data-action="lead-toggle" data-lead="{{ c.lead.id }}" data-field="favorite" data-value="{{ 'false' if c.lead.favorite else 'true' }}">★ Favorito</button>
+      <button class="{{ 'on' if c.lead.analyzed }}" data-action="lead-toggle" data-lead="{{ c.lead.id }}" data-field="analyzed" data-value="{{ 'false' if c.lead.analyzed else 'true' }}">Analisado</button>
+      <button class="{{ 'on' if c.lead.discarded }}" data-action="lead-toggle" data-lead="{{ c.lead.id }}" data-field="discarded" data-value="{{ 'false' if c.lead.discarded else 'true' }}">{{ 'Restaurar' if c.lead.discarded else 'Descartar' }}</button>
+    {% endif %}
+    {% if c.website %}<a class="btn" href="{{ c.website }}" target="_blank" rel="noopener noreferrer">Abrir site</a>{% endif %}
+    <a class="btn" href="{{ maps_url(c) }}" target="_blank" rel="noopener noreferrer">Abrir mapa</a>
+    {% if not c.is_mock %}<button data-action="lookup" data-cnpj="{{ c.cnpj }}" title="Consulta a API pública (cache de 30 dias ignorado)">Atualizar cadastro</button>
+    <button data-action="enrich" data-id="{{ c.id }}">Buscar contatos no site</button>{% endif %}
+  </div>
+</section>
+
+<div class="grid grid-2">
+  <section class="card">
+    <h2>Compatibilidade com perfil atual: {{ c.similarity|round|int }}% <span class="badge est">estimativa</span></h2>
+    {% set sd = c.similarity_details or {} %}
+    {% if sd.note %}<p class="notice warn">{{ sd.note }}</p>{% endif %}
+    <ul class="criteria">
+    {% for cr in sd.criteria or [] %}
+      <li><span class="pts">{{ '%.1f'|format(cr.points) }} pts</span> — <strong>{{ cr.label }}</strong> <small class="muted">(peso {{ (cr.weight * 100)|round|int }}%)</small><br><small>{{ cr.explanation }}</small></li>
+    {% endfor %}
+    </ul>
+    {% if sd.similar_customers %}<p>Perfil semelhante a <strong>{{ sd.similar_customers }}</strong> cliente(s) existente(s) (mesma atividade CNAE).</p>{% endif %}
+  </section>
+  <section class="card">
+    <h2>Potencial: {{ c.potential|round|int }} <span class="badge est">estimativa</span></h2>
+    {% set pd = c.potential_details or {} %}
+    {% if pd.note %}<p class="notice warn">{{ pd.note }}</p>{% endif %}
+    <ul class="criteria">
+    {% for cr in pd.criteria or [] %}
+      <li><span class="pts">{{ '%.1f'|format(cr.points) }} pts</span> — <strong>{{ cr.label }}</strong> <small class="muted">(peso {{ (cr.weight * 100)|round|int }}%)</small><br><small>{{ cr.explanation }}</small></li>
+    {% endfor %}
+    </ul>
+    <p class="muted"><small>Indício de aderência comercial, não uma garantia de compra. <a href="/metodologia">Como é calculado</a>.</small></p>
+  </section>
+</div>
+
+<div class="grid grid-2">
+  <section class="card">
+    <h2>Dados cadastrais</h2>
+    <dl class="kv">
+      <dt>Razão social</dt><dd>{{ c.razao_social or '—' }}</dd>
+      <dt>Nome fantasia</dt><dd>{{ c.nome_fantasia or '—' }}</dd>
+      <dt>CNPJ</dt><dd class="mono">{{ c.cnpj|cnpj }} <button class="btn-sm" data-action="copy" data-value="{{ c.cnpj|cnpj }}">Copiar</button></dd>
+      <dt>Situação cadastral</dt><dd>{{ SITUACAO_LABELS.get(c.situacao_cadastral, '—') }}{% if c.data_situacao %} desde {{ c.data_situacao.strftime('%d/%m/%Y') }}{% endif %}</dd>
+      <dt>Data de abertura</dt><dd>{{ c.data_abertura.strftime('%d/%m/%Y') if c.data_abertura else '—' }} ({{ age }})</dd>
+      <dt>Natureza jurídica</dt><dd>{{ c.natureza_juridica or c.natureza_juridica_code or '—' }}</dd>
+      <dt>Porte</dt><dd>{{ PORTE_LABELS.get(c.porte, '—') }}</dd>
+      <dt>Capital social</dt><dd>{{ ('R$ ' ~ '{:,.2f}'.format(c.capital_social).replace(',', 'X').replace('.', ',').replace('X', '.')) if c.capital_social is not none else 'Não disponível' }}</dd>
+      <dt>Endereço</dt><dd>{{ [c.logradouro, c.numero, c.complemento, c.bairro]|select|join(', ') or '—' }}{% if c.cep %} · CEP {{ c.cep[:5] }}-{{ c.cep[5:] }}{% endif %}</dd>
+      <dt>Cidade / UF</dt><dd>{{ c.municipio or '—' }} / {{ c.uf or '—' }}</dd>
+      <dt>Região</dt><dd>{{ c.region or '—' }}</dd>
+      <dt>Fonte</dt><dd>{{ 'MOCK (fictício)' if c.is_mock else c.source }}{% if c.source_reference %} · ref. {{ c.source_reference }}{% endif %}<br><small class="muted">dados da fonte em {{ c.source_updated_at.strftime('%d/%m/%Y') if c.source_updated_at else '—' }} · na base desde {{ c.first_seen_at.strftime('%d/%m/%Y') }}</small></dd>
+    </dl>
+  </section>
+  <section class="card">
+    <h2>Atividade</h2>
+    <dl class="kv">
+      <dt>CNAE principal</dt><dd><span class="mono">{{ c.cnae_principal|cnae }}</span> — {{ c.cnae_principal_desc or cnae_desc.get(c.cnae_principal, '') }}</dd>
+      <dt>CNAEs secundários</dt><dd>{% for s in c.secondary_cnaes %}<div><span class="mono">{{ s|cnae }}</span> {{ cnae_desc.get(s, '') }}</div>{% else %}—{% endfor %}</dd>
+      <dt>Segmento</dt><dd>{{ c.segment.name if c.segment else '—' }}<br><small class="muted">{{ c.segment_explanation or '' }}</small>
+        <div class="row">
+          <select data-field-segment aria-label="Definir segmento manualmente"><option value="">Corrigir segmento…</option>{% for s in segments %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}</select>
+          <button class="btn-sm" data-action="set-segment" data-id="{{ c.id }}">Salvar</button>
+          {% if c.segment_method == 'manual' %}<button class="btn-sm" data-action="clear-segment" data-id="{{ c.id }}">Voltar ao automático</button>{% endif %}
+        </div>
+      </dd>
+      {% if c.site_description %}<dt>Descrição (site)</dt><dd>{{ c.site_description }}</dd>{% endif %}
+    </dl>
+    {% if siblings %}
+    <h3>Outros estabelecimentos do mesmo CNPJ básico</h3>
+    <ul>{% for s in siblings %}<li><a href="/empresas/{{ s.id }}">{{ s.cnpj|cnpj }}</a> — {{ 'Matriz' if s.is_matriz else 'Filial' }}, {{ s.municipio }}/{{ s.uf }}{% if s.is_customer %} <span class="badge ok">cliente</span>{% endif %}</li>{% endfor %}</ul>
+    {% endif %}
+  </section>
+</div>
+
+<div class="grid grid-2">
+  <section class="card">
+    <h2>Informações comerciais e contatos</h2>
+    <dl class="kv">
+      <dt>Site</dt><dd>{% if c.website %}<a href="{{ c.website }}" target="_blank" rel="noopener noreferrer">{{ c.website }}</a>
+        <span class="badge {{ 'ok' if c.website_status in ('verificado', 'manual') else 'warn' }}">{{ {'verificado': 'verificado', 'manual': 'informado por você', 'inferido': 'inferido do e-mail — não confirmado'}.get(c.website_status, c.website_status) }}</span>{% else %}Não disponível{% endif %}
+        <form class="row" data-form="website" data-id="{{ c.id }}"><input type="url" name="website" placeholder="https://site-da-empresa.com.br" maxlength="255" aria-label="Informar site"><button class="btn-sm" type="submit">Salvar site</button></form>
+      </dd>
+    </dl>
+    <table class="responsive">
+      <thead><tr><th>Tipo</th><th>Contato</th><th>Origem</th><th></th></tr></thead>
+      <tbody>
+      {% for ct in c.contacts|sort(attribute='kind') %}
+        <tr>
+          <td data-label="Tipo">{{ ct.kind }}{% if not ct.is_company %} <span class="badge warn" title="Pode ser dado de pessoa física (LGPD): use apenas para contato comercial com a empresa">possível pessoal</span>{% endif %}</td>
+          <td data-label="Contato" class="mono">{% if ct.kind == 'telefone' %}{{ ct.value|phone }}{% elif ct.kind in ('linkedin', 'instagram', 'facebook') %}<a href="{{ ct.value }}" target="_blank" rel="noopener noreferrer">{{ ct.value }}</a>{% elif ct.kind == 'whatsapp' %}<a href="https://wa.me/{{ ct.value }}" target="_blank" rel="noopener noreferrer">+{{ ct.value }}</a>{% elif ct.kind == 'email' %}<a href="mailto:{{ ct.value }}">{{ ct.value }}</a>{% else %}{{ ct.value }}{% endif %}</td>
+          <td data-label="Origem"><small>{{ ct.source }}{% if ct.source_url %} · <a href="{{ ct.source_url }}" target="_blank" rel="noopener noreferrer">página</a>{% endif %} · {{ ct.fetched_at.strftime('%d/%m/%Y') }}</small></td>
+          <td><button class="btn-sm" data-action="copy" data-value="{{ ct.value }}">Copiar</button> <button class="btn-sm" data-action="delete-contact" data-id="{{ ct.id }}" title="Excluir contato (ex.: pedido do titular)">Excluir</button></td>
+        </tr>
+      {% else %}<tr><td colspan="4" class="muted">Nenhum contato público disponível. Nenhum contato é inventado.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+    {% if c.enriched_at %}<p class="muted"><small>Site verificado pela última vez em {{ c.enriched_at.strftime('%d/%m/%Y %H:%M') }}.</small></p>{% endif %}
+  </section>
+
+  <section class="card">
+    <h2>Informações fiscais</h2>
+    <p class="notice"><small>Dados auxiliares para análise comercial/fiscal. <strong>Não constituem aconselhamento tributário.</strong> Legenda: <span class="badge ok">Confirmado</span> fonte oficial · <span class="badge warn">Provável</span> inferido · <span class="badge">Possível</span> hipótese a confirmar.</small></p>
+    <div class="stack">
+      <div class="card level-{{ 'confirmado' if c.icms_status.startswith('confirmado') or c.icms_status == 'nao_contribuinte' else 'provavel' if c.icms_status == 'provavel' else 'possivel' }}">
+        <strong>ICMS:</strong> {{ ICMS_LABELS.get(c.icms_status) }}
+        {% if icms_inference %}<br><small>{{ icms_inference.notes }} Confiança: {{ (icms_inference.confidence * 100)|round|int }}%.</small>{% endif %}
+        <div class="row">
+          {% if sefaz_enabled and not c.is_mock %}<button class="btn-sm" data-action="icms" data-id="{{ c.id }}">Consultar na SEFAZ</button>{% else %}<small class="muted">Consulta oficial automática não configurada (requer certificado digital). Verifique manualmente no <a href="{{ sintegra_url }}" target="_blank" rel="noopener noreferrer">Sintegra</a>.</small>{% endif %}
+        </div>
+      </div>
+      <div class="card {{ 'level-confirmado' if c.simples_opcao is not none and not c.is_mock else 'level-possivel' }}">
+        <strong>Simples Nacional:</strong> {{ 'Optante' if c.simples_opcao else ('Não optante' if c.simples_opcao is sameas false else 'Não disponível') }}
+        {% if c.simples_data_opcao %} desde {{ c.simples_data_opcao.strftime('%d/%m/%Y') }}{% endif %}{% if c.simples_data_exclusao %} · excluído em {{ c.simples_data_exclusao.strftime('%d/%m/%Y') }}{% endif %}
+        · <strong>MEI:</strong> {{ 'Sim' if c.mei_opcao else ('Não' if c.mei_opcao is sameas false else 'Não disponível') }}
+        <br><small class="muted">Fonte: {{ 'MOCK (fictício)' if c.is_mock else ('Receita Federal — dados abertos, arquivo Simples' if c.source == 'receita_open_data' else c.source) }}{% if c.source_reference %}, ref. {{ c.source_reference }}{% endif %}. Regime Lucro Presumido/Real: não disponível em fonte aberta.</small>
+      </div>
+      {% for f in c.fiscal_infos|sort(attribute='consulted_at', reverse=true) %}
+      <div class="card level-{{ f.level }}">
+        <div class="row"><strong>{{ f.label }}</strong> <span class="badge {{ 'ok' if f.level == 'confirmado' else ('warn' if f.level == 'provavel' else '') }}">{{ f.level }}</span><span class="spacer"></span>
+          {% if f.created_by == 'usuario' %}<button class="btn-sm" data-action="delete-fiscal" data-id="{{ f.id }}">Excluir</button>{% endif %}</div>
+        {% if f.value %}<div>{{ f.value }}</div>{% endif %}
+        <small class="muted">Fonte: {{ f.source }}{% if f.source_url %} · <a href="{{ f.source_url }}" target="_blank" rel="noopener noreferrer">referência</a>{% endif %} · consultado em {{ f.consulted_at.strftime('%d/%m/%Y') }}{% if f.data_date %} · dado de {{ f.data_date.strftime('%d/%m/%Y') }}{% endif %} · confiança {{ (f.confidence * 100)|round|int }}%{% if f.notes %} · {{ f.notes }}{% endif %}</small>
+      </div>
+      {% endfor %}
+    </div>
+    <details>
+      <summary>Registrar informação ou benefício fiscal (com fonte)</summary>
+      <form class="stack" data-form="fiscal" data-id="{{ c.id }}">
+        <div class="grid grid-2">
+          <div><label>Categoria</label><select name="category" required><option value="beneficio">Benefício fiscal</option><option value="regime_especial">Regime especial</option><option value="inscricao_estadual">Inscrição estadual</option><option value="icms">ICMS</option><option value="regime_apuracao">Regime de apuração</option><option value="outro">Outro</option></select></div>
+          <div><label>Nível</label><select name="level" required><option value="possivel">Possível (hipótese)</option><option value="provavel">Provável (inferido)</option><option value="confirmado">Confirmado (fonte oficial)</option></select></div>
+          <div><label>Título</label><input type="text" name="label" required maxlength="200"></div>
+          <div><label>Valor/descrição</label><input type="text" name="value" maxlength="2000"></div>
+          <div><label>Fonte (obrigatória)</label><input type="text" name="source" required maxlength="120" placeholder="ex.: SEFAZ-SP, Diário Oficial"></div>
+          <div><label>URL/referência</label><input type="url" name="source_url" maxlength="500"></div>
+          <div><label>Data do dado</label><input type="date" name="data_date"></div>
+          <div><label>Confiança (0 a 1)</label><input type="number" name="confidence" min="0" max="1" step="0.05" value="0.5" required></div>
+        </div>
+        <div><label>Observações</label><textarea name="notes" maxlength="2000" rows="2"></textarea></div>
+        <button type="submit">Registrar</button>
+      </form>
+    </details>
+  </section>
+</div>
+
+<div class="grid grid-2">
+  <section class="card">
+    <h2>Observações do lead</h2>
+    {% if c.lead %}
+    <form class="stack" data-form="note" data-lead="{{ c.lead.id }}"><textarea name="text" rows="3" maxlength="5000" required placeholder="Ex.: falei com o comprador, retornar em 15 dias"></textarea><button type="submit">Adicionar observação</button></form>
+    <ul>{% for n in c.lead.notes %}<li><small class="muted">{{ n.created_at.strftime('%d/%m/%Y %H:%M') }}</small> — {{ n.text }} <button class="btn-sm" data-action="delete-note" data-id="{{ n.id }}">excluir</button></li>{% else %}<li class="muted">Sem observações.</li>{% endfor %}</ul>
+    {% else %}<p class="muted">Salve a empresa como lead para registrar observações e status.</p>{% endif %}
+  </section>
+  <section class="card">
+    <h2>Histórico de alterações cadastrais</h2>
+    <table class="responsive"><thead><tr><th>Data</th><th>Campo</th><th>De</th><th>Para</th></tr></thead><tbody>
+    {% for ch in changes %}<tr><td data-label="Data">{{ ch.changed_at.strftime('%d/%m/%Y') }}</td><td data-label="Campo">{{ ch.field }}</td><td data-label="De">{{ ch.old_value or '—' }}</td><td data-label="Para">{{ ch.new_value or '—' }}</td></tr>
+    {% else %}<tr><td colspan="4" class="muted">Nenhuma alteração detectada desde a primeira coleta.</td></tr>{% endfor %}
+    </tbody></table>
+  </section>
+</div>
+{% endblock %}
