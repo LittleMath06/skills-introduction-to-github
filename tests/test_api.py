@@ -433,3 +433,12 @@ def test_customer_manual_cnpj(client, db):
     assert client.patch("/api/customers/999", json={"cnpj": cnpj}).status_code == 404
     page = client.get("/clientes?status=sem_cnpj")
     assert page.status_code == 200 and "BETA LTDA" in page.text and "ALFA LTDA" not in page.text
+
+
+def test_hosting_database_url_is_normalized():
+    from prospeccao.config import normalize_database_url
+
+    assert normalize_database_url("postgres://u:p@h:5432/db") == "postgresql+psycopg://u:p@h:5432/db"
+    assert normalize_database_url("postgresql://u:p@h/db") == "postgresql+psycopg://u:p@h/db"
+    assert normalize_database_url("postgresql+psycopg://x") == "postgresql+psycopg://x"
+    assert normalize_database_url("sqlite:///a.db") == "sqlite:///a.db"

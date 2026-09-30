@@ -68,6 +68,15 @@ class Settings:
         return self.env == "production"
 
 
+def normalize_database_url(url: str) -> str:
+    """Hospedagens (Render, Railway, Heroku…) fornecem 'postgres://' ou 'postgresql://';
+    o driver instalado é o psycopg 3, que o SQLAlchemy espera como 'postgresql+psycopg://'."""
+    for prefix in ("postgres://", "postgresql://"):
+        if url.startswith(prefix):
+            return "postgresql+psycopg://" + url[len(prefix):]
+    return url
+
+
 def load_settings() -> Settings:
     _load_dotenv(Path(os.environ.get("ENV_FILE", ".env")))
     env = os.environ.get("APP_ENV", "development").lower()
@@ -80,7 +89,8 @@ def load_settings() -> Settings:
     settings = Settings(
         env=env,
         secret_key=secret,
-        database_url=os.environ.get("DATABASE_URL", f"sqlite:///{data_dir / 'prospeccao.db'}"),
+        database_url=normalize_database_url(
+            os.environ.get("DATABASE_URL") or f"sqlite:///{data_dir / 'prospeccao.db'}"),
         data_dir=data_dir,
         session_max_age=int(os.environ.get("SESSION_MAX_AGE", str(8 * 3600))),
         admin_username=os.environ.get("ADMIN_USERNAME", "paulo"),

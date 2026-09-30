@@ -1,0 +1,37 @@
+# Blueprint do Render (https://render.com/docs/blueprint-spec)
+# No painel do Render: New > Blueprint > selecione este repositório.
+# Cria: serviço web (Docker) + PostgreSQL 16 + disco persistente para os arquivos da Receita.
+# Confira os planos/preços no painel antes de confirmar (os nomes de plano podem mudar).
+services:
+  - type: web
+    name: prospeccao
+    runtime: docker
+    plan: starter            # plano pago: não "dorme" e permite disco persistente
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: ALLOW_MOCK_DATA
+        value: "false"
+      - key: DATA_DIR
+        value: /data
+      - key: SECRET_KEY
+        generateValue: true  # gerada automaticamente pelo Render
+      - key: ADMIN_USERNAME
+        value: paulo
+      - key: ADMIN_PASSWORD
+        sync: false          # o painel pede o valor (mínimo 10 caracteres)
+      - key: DATABASE_URL
+        fromDatabase:
+          name: prospeccao-db
+          property: connectionString
+    disk:
+      name: prospeccao-data
+      mountPath: /data
+      sizeGB: 40             # ZIPs mensais da Receita (~25 GB) + folga
+
+databases:
+  - name: prospeccao-db
+    postgresMajorVersion: "16"
+    plan: basic-1gb

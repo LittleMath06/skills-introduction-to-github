@@ -332,6 +332,41 @@ nome, os ambíguos e completar CNPJs; 4) revisar segmentos e pesos; 5) enriquece
 
 ## 24. Deploy
 
+### 24.1 Onde hospedar (e por que não no Netlify)
+
+O Netlify hospeda sites estáticos e funções serverless curtas em JavaScript/TypeScript/Go. Este
+sistema precisa de **servidor Python contínuo, PostgreSQL, disco persistente e processos longos**
+(a importação mensal da Receita leva horas). Por isso **não roda no Netlify** — publicar só os
+arquivos HTML/CSS geraria páginas sem login, sem banco e sem busca.
+
+| Opção | Adequação | Observação |
+|---|---|---|
+| **Render (Blueprint `render.yaml`)** | ✅ recomendada | Docker + PostgreSQL gerenciado + disco + HTTPS automático, configurado em poucos cliques |
+| Railway / Fly.io | ✅ | usam o mesmo `Dockerfile` (porta via `PORT`); criar PostgreSQL e volume no painel |
+| VPS própria (docker-compose) | ✅ | mais barata em volume grande; exige administrar o servidor (§24.3) |
+| Netlify / GitHub Pages / Vercel estático | ❌ | não executam o backend Python nem mantêm banco |
+
+### 24.2 Render (passo a passo)
+
+1. Suba este repositório para o GitHub (privado).
+2. No Render: **New → Blueprint**, escolha o repositório. O `render.yaml` cria o serviço web
+   (Docker), o PostgreSQL 16 e um disco de 40 GB em `/data`.
+3. Informe `ADMIN_PASSWORD` quando o painel pedir (≥ 10 caracteres). `SECRET_KEY` é gerada
+   automaticamente; `DATABASE_URL` vem do banco criado (o sistema converte o formato `postgres://`).
+4. Após o deploy, acesse a URL `https://….onrender.com` (HTTPS automático) e faça login.
+5. Em *Clientes*, importe a planilha; em *Administração*, rode a importação da Receita
+   ("Baixar mês mais recente e importar"). Repita mensalmente (ou agende um Cron Job no Render com
+   `python -m prospeccao.cli update` — atenção: cron jobs do Render não compartilham o disco do
+   serviço web, então prefira disparar pela página *Administração*).
+6. Domínio próprio: *Settings → Custom Domains* no serviço web.
+7. Backup: o PostgreSQL gerenciado tem backups conforme o plano; exporte periodicamente com
+   `pg_dump` usando a *External Database URL*.
+
+Confira planos e preços no painel antes de confirmar (os nomes de plano no `render.yaml` podem
+precisar de ajuste). Planos gratuitos "dormem" e não têm disco persistente — não recomendados.
+
+### 24.3 VPS própria (docker-compose)
+
 Servidor Linux com Docker (VPS de 2 vCPU/4 GB RAM é suficiente para a base filtrada; reserve disco
 para os ZIPs da Receita, ~25 GB se baixar o mês inteiro):
 

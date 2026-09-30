@@ -37,7 +37,10 @@ Acesse <http://localhost:8000>. Testes: `pytest` (133 testes; também em Postgre
 
 ## Produção
 
-`docker compose up -d --build` (app + PostgreSQL + Caddy com HTTPS automático). Detalhes de
+**Não use Netlify** (só executa sites estáticos e funções JS/Go curtas; este sistema precisa de
+servidor Python, PostgreSQL e disco). Opção recomendada: **Render** com o `render.yaml` incluso
+(New → Blueprint). Alternativa: VPS com `docker compose up -d --build` (app + PostgreSQL + Caddy com
+HTTPS automático). Detalhes de
 configuração, backup, atualização mensal e monitoramento em
 [docs/10-documentacao-final.md](docs/10-documentacao-final.md#24-deploy).
 
