@@ -22,18 +22,21 @@ potenciais clientes em todo o Brasil, usando como referência a base de empresas
 
 ## Início rápido (desenvolvimento)
 
+> **Passo a passo completo, do zero até a produção (Windows, macOS e Linux):**
+> [docs/08-tutorial-instalacao-e-deploy.md](docs/08-tutorial-instalacao-e-deploy.md)
+
 ```bash
-python3.11 -m venv .venv && . .venv/bin/activate
-pip install -r requirements-dev.txt
-cp .env.example .env          # preencha SECRET_KEY e ADMIN_PASSWORD
-export PYTHONPATH=src
+python3 -m venv .venv && source .venv/bin/activate     # Windows: py -3.12 -m venv .venv; .\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements-dev.txt
+python -m pip install -e .
+cp .env.example .env          # preencha SECRET_KEY e ADMIN_PASSWORD (≥ 10 caracteres)
 python -m prospeccao.cli init
 python -m prospeccao.cli seed-mock      # opcional: dados FICTÍCIOS (marcados MOCK)
 uvicorn prospeccao.main:app_factory --factory --reload
 ```
 
-Acesse <http://localhost:8000>. Testes: `pytest` (133 testes; também em PostgreSQL com
-`TEST_DATABASE_URL`).
+Acesse <http://localhost:8000>. Testes: `python -m pytest` (135 testes; Python 3.11–3.13; também
+em PostgreSQL com `TEST_DATABASE_URL`).
 
 ## Produção
 
@@ -55,6 +58,7 @@ configuração, backup, atualização mensal e monitoramento em
 | [05 — UX/wireframes](docs/05-ux-wireframes.md) | fluxos e telas |
 | [06 — API](docs/06-api.md) | endpoints, filtros, códigos de erro |
 | [07 — Análise da base de clientes](docs/07-analise-base-clientes.md) | estrutura e padrões da planilha recebida (agregado) |
+| [08 — Tutorial: instalação, execução e deploy](docs/08-tutorial-instalacao-e-deploy.md) | passo a passo do zero até a produção, troubleshooting e checklist |
 | [10 — Documentação final](docs/10-documentacao-final.md) | visão completa, metodologias, testes, resultados, limitações, instalação, deploy |
 
 ## Estrutura

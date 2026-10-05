@@ -5,7 +5,8 @@ Sistema de Prospecção de Clientes — fios, cabos elétricos e cabos especiais
 Documentos de apoio: [01 Requisitos](01-requisitos.md) · [02 Fontes de dados](02-fontes-de-dados.md) ·
 [03 Arquitetura](03-arquitetura.md) · [04 Banco de dados](04-database.md) ·
 [05 UX/wireframes](05-ux-wireframes.md) · [06 API](06-api.md) ·
-[07 Análise da base de clientes](07-analise-base-clientes.md)
+[07 Análise da base de clientes](07-analise-base-clientes.md) ·
+[08 Tutorial de instalação e deploy](08-tutorial-instalacao-e-deploy.md)
 
 ---
 
@@ -210,14 +211,14 @@ confirmação. "Confirmado" somente via SEFAZ.
 
 ## 18. Testes realizados
 
-Executados em 30/09/2026 nesta versão — **133 testes, todos aprovados em SQLite e em PostgreSQL 16**:
+Executados em 30/09/2026 nesta versão — **135 testes, todos aprovados em SQLite e em PostgreSQL 16** (e em Python 3.11, 3.12 e 3.13):
 
 | Arquivo | Tipo | Qtde | Cobre |
 |---|---|---|---|
 | `test_domain.py` | unitários | 53 | CNPJ (incl. alfanumérico, zeros perdidos em planilha, inválidos), telefones/e-mails, regiões, classificação por CNAE/palavra-chave/fallback, similaridade, pesos, potencial, completude, inferência de ICMS, pesquisa livre, chaves de nome e abreviações de ERP, redistribuição de pesos sem dados |
 | `test_sources.py` | integração (HTTP simulado) | 23 | layout Receita, ZIP latin-1, download inválido, API de CNPJ (200/404/429/500/sem rede/JSON inválido), rate limiter, SEFAZ (111/259/erro/XML inválido/não configurada), site (contatos, pessoal × empresa, robots.txt, robots indisponível, não-HTML, verificação de propriedade) |
 | `test_imports.py` | integração (banco) | 16 | importação filtrada, reimportação idempotente, mudanças e baixas, filtros por UF, falha de fonte registrada, pontuação após importação, CSV/XLSX de clientes com CNPJ inválido/CPF/duplicado/sem CNPJ/linhas vazias/cabeçalho deslocado, arquivos inválidos, vínculo com empresas e perfil, CNPJ duplicado no mesmo lote, truncamento de campos longos, lista só com nomes (formato da planilha real, com nomes fictícios), identificação pela razão social nos arquivos da Receita (exato, nome cortado, homônimos → ambíguo), vínculo pelo nome na base local, reenvio com CNPJ sem duplicar |
-| `test_api.py` | funcionais e negativos | 39 | login/logout, senha errada, rate limit, CSRF, todas as rotas protegidas, cabeçalhos, hash de senha, configuração insegura em produção, MOCK bloqueado, filtros/ordenação/paginação, pesquisa livre, filtros inválidos (422), 404, ciclo do lead, segmento manual, informações fiscais com fonte, pesos/segmentos/status, dashboard, consulta de CNPJ com cache e falhas, enriquecimento por site, ICMS confirmado, job com falha, upload inválido, exclusão de contato (LGPD), CNPJ manual de cliente |
+| `test_api.py` | funcionais e negativos | 41 | login/logout, senha errada, rate limit, CSRF, todas as rotas protegidas, cabeçalhos, hash de senha, configuração insegura em produção, MOCK bloqueado, filtros/ordenação/paginação, pesquisa livre, filtros inválidos (422), 404, ciclo do lead, segmento manual, informações fiscais com fonte, pesos/segmentos/status, dashboard, consulta de CNPJ com cache e falhas, enriquecimento por site, ICMS confirmado, job com falha, upload inválido, exclusão de contato (LGPD), CNPJ manual de cliente |
 | `test_ui.py` | interface (Chromium) | 2 | fluxo completo em desktop e celular: login (inclusive senha errada), pesquisa livre, remoção de filtro, detalhes, salvar lead, status, observação, lista de leads, sem rolagem horizontal, sem erros de JavaScript |
 
 Como rodar: `pytest` (SQLite) · `TEST_DATABASE_URL=postgresql+psycopg://... pytest` (PostgreSQL).

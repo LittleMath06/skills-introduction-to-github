@@ -6,7 +6,8 @@ services:
   - type: web
     name: prospeccao
     runtime: docker
-    plan: starter            # plano pago: não "dorme" e permite disco persistente
+    plan: starter            # pago (0,5 CPU / 512 MB): não "dorme" e permite disco. Se a importação
+                             # da Receita reiniciar por falta de memória, mude para "standard".
     healthCheckPath: /health
     autoDeploy: true
     envVars:
@@ -35,3 +36,4 @@ databases:
   - name: prospeccao-db
     postgresMajorVersion: "16"
     plan: basic-1gb
+    diskSizeGB: 15           # armazenamento do banco (1 ou múltiplo de 5); aumente conforme a base cresce
