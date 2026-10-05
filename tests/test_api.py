@@ -456,3 +456,16 @@ def test_empty_secret_key_in_env_file(monkeypatch, tmp_path):
     monkeypatch.setenv("ALLOW_MOCK_DATA", "false")
     with pytest.raises(RuntimeError, match="SECRET_KEY"):
         load_settings()
+
+
+@pytest.mark.parametrize("encoding", ["utf-8-sig", "utf-16", "cp1252"])
+def test_env_file_saved_by_windows_notepad(monkeypatch, tmp_path, encoding):
+    """O Bloco de Notas pode salvar com BOM, em UTF-16 ou ANSI: a 1ª variável não pode se perder."""
+    env = tmp_path / ".env"
+    env.write_bytes("ADMIN_USERNAME=joão\nADMIN_PASSWORD=Senha-Forte-123\n".encode(encoding))
+    for k in ("ADMIN_USERNAME", "ADMIN_PASSWORD", "APP_ENV", "DATABASE_URL"):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv("ENV_FILE", str(env))
+    s = load_settings()
+    assert s.admin_username == "joão" and s.admin_password == "Senha-Forte-123"
+    assert "\\" not in s.database_url  # caminho do SQLite com "/" também no Windows

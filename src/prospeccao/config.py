@@ -14,11 +14,23 @@ from pathlib import Path
 DEV_SECRET = "dev-insecure-secret-change-me"
 
 
+def _read_text_any(path: Path) -> str:
+    """Lê o .env em UTF-8 (com ou sem BOM), UTF-16 ou ANSI/Windows-1252 — formatos que o Bloco de
+    Notas do Windows pode gravar."""
+    data = path.read_bytes()
+    if data[:2] in (b"\xff\xfe", b"\xfe\xff"):
+        return data.decode("utf-16")
+    try:
+        return data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return data.decode("cp1252", errors="replace")
+
+
 def _load_dotenv(path: Path) -> None:
     """Carrega um .env simples (CHAVE=valor) sem sobrescrever variáveis já definidas."""
     if not path.is_file():
         return
-    for raw in path.read_text(encoding="utf-8").splitlines():
+    for raw in _read_text_any(path).splitlines():
         line = raw.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
@@ -91,7 +103,7 @@ def load_settings() -> Settings:
         env=env,
         secret_key=secret,
         database_url=normalize_database_url(
-            os.environ.get("DATABASE_URL") or f"sqlite:///{data_dir / 'prospeccao.db'}"),
+            os.environ.get("DATABASE_URL") or f"sqlite:///{(data_dir / 'prospeccao.db').as_posix()}"),
         data_dir=data_dir,
         session_max_age=int(os.environ.get("SESSION_MAX_AGE", str(8 * 3600))),
         admin_username=os.environ.get("ADMIN_USERNAME", "paulo"),
