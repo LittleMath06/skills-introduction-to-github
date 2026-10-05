@@ -6,15 +6,23 @@ Este tutorial parte de um computador sem nada instalado. Ele leva você a rodar 
 máquina, testá-lo e publicá-lo na internet com HTTPS. Siga as etapas **na ordem**. Cada comando
 vem acompanhado de uma explicação do que ele faz.
 
+> 🪟 **Usa Windows?** Comece pelo [Caminho rápido no Windows](#caminho-rápido-no-windows-scripts-automáticos):
+> dois scripts fazem a instalação e a execução por você. As etapas 1 a 10 explicam cada passo em
+> detalhe e servem de referência quando algo der errado.
+
 > **Validação:** os comandos deste tutorial foram executados em 05/10/2026 num clone limpo do
-> projeto, no Linux, com Python 3.11, 3.12 e 3.13 (135 testes aprovados). Os comandos de Windows e
-> macOS são os equivalentes oficiais de cada sistema, mas **não foram executados nessas
-> plataformas**. Se algo divergir, veja a [Etapa 9 — Troubleshooting](#9-troubleshooting).
+> projeto, com Python 3.11, 3.12 e 3.13 (138 testes aprovados). Os scripts do Windows
+> (`scripts/windows/*.ps1`) foram executados de ponta a ponta com o PowerShell 7.4 e verificados
+> pelo analisador oficial da Microsoft (PSScriptAnalyzer) quanto à compatibilidade com o
+> **Windows PowerShell 5.1**, que vem no Windows: 0 problemas. Não houve um teste num computador
+> Windows físico. Se algo divergir, veja a [Etapa 9 — Troubleshooting](#9-troubleshooting),
+> em especial a [9.6](#96-problemas-específicos-do-windows).
 
 ---
 
 ## Sumário
 
+* 🪟 [Caminho rápido no Windows (scripts automáticos)](#caminho-rápido-no-windows-scripts-automáticos)
 0. [Antes de começar: decisões e informações necessárias](#0-antes-de-começar-decisões-e-informações-necessárias)
 1. [Pré-requisitos](#1-pré-requisitos)
 2. [Configuração do ambiente](#2-configuração-do-ambiente)
@@ -34,6 +42,129 @@ vem acompanhado de uma explicação do que ele faz.
   "PowerShell". Não use o "Prompt de Comando" (cmd), a menos que o bloco indique.
 * Quando não há marcação, o comando é igual em todos os sistemas.
 * Linhas que começam com `#` são comentários: não precisam ser digitadas.
+
+---
+
+## Caminho rápido no Windows (scripts automáticos)
+
+O projeto traz scripts que executam, sozinhos, as etapas 2 a 5 deste tutorial no Windows. Você
+precisa apenas do **Python** e do **Git** instalados (etapa 1).
+
+### Passo 1 — Instalar Python e Git (uma única vez)
+
+Abra o **PowerShell** (menu Iniciar → digite "PowerShell" → Enter) e execute:
+
+```powershell
+# Instala o Python 3.12 e o Git pelo gerenciador oficial do Windows (winget)
+winget install --id Python.Python.3.12 -e --source winget
+winget install --id Git.Git -e --source winget
+```
+
+**Feche o PowerShell e abra de novo**, para que os comandos novos sejam reconhecidos. Depois
+confira:
+
+```powershell
+py --list          # deve listar -V:3.12
+git --version      # deve mostrar "git version 2.x"
+```
+
+### Passo 2 — Baixar o projeto
+
+```powershell
+# Cria a pasta de projetos e entra nela (fora do OneDrive, para evitar travamentos)
+New-Item -ItemType Directory -Force -Path C:\projetos | Out-Null
+Set-Location C:\projetos
+# Baixa o código e entra na pasta
+git clone https://github.com/LittleMath06/skills-introduction-to-github.git prospeccao
+Set-Location C:\projetos\prospeccao
+# Branch com o sistema (pule se o código já estiver no main)
+git checkout claude/happy-hamilton-lnok0r
+```
+
+> Recebeu o **`prospeccao-sistema.zip`**? Clique com o botão direito → *Extrair tudo…* →
+> `C:\projetos`. Depois, no PowerShell: `Set-Location C:\projetos\prospeccao` e libere os
+> arquivos baixados da internet com `Get-ChildItem -Recurse | Unblock-File`.
+
+### Passo 3 — Instalar (uma única vez)
+
+Escolha uma das formas:
+
+* **Duplo clique** em `instalar-windows.bat`, na pasta do projeto; **ou**
+* no PowerShell, dentro da pasta do projeto:
+
+```powershell
+# -ComDadosFicticios: cria 400 empresas FICTÍCIAS (MOCK) para você conhecer as telas
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\instalar.ps1 -ComDadosFicticios
+```
+
+O que o script faz:
+
+1. Encontra o Python 3.11–3.13 (usando o lançador `py`).
+2. Cria o ambiente virtual `.venv`.
+3. Instala todas as dependências e o projeto.
+4. Cria o `.env` a partir do `.env.example` e **gera a `SECRET_KEY` sozinho**.
+5. **Pede a senha** do usuário `paulo`. Ela não aparece enquanto você digita e precisa ter no
+   mínimo 10 caracteres.
+6. Cria o banco de dados local (`data\prospeccao.db`).
+
+O script pode ser executado de novo com segurança: ele **não** apaga o `.env` nem o banco.
+
+> `-ExecutionPolicy Bypass` libera a execução **apenas deste script, nesta vez**, sem alterar a
+> configuração de segurança do Windows.
+
+### Passo 4 — Usar o sistema
+
+* **Duplo clique** em `iniciar-windows.bat`: o navegador abre sozinho em <http://localhost:8000>; **ou**
+* no PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\iniciar.ps1 -AbrirNavegador
+```
+
+Entre com o usuário **`paulo`** e a senha definida no passo 3. **Para parar:** `Ctrl + C` na
+janela do PowerShell (ou feche a janela). **Para reiniciar:** rode o comando, ou dê o duplo
+clique, de novo.
+
+Opções do `iniciar.ps1`:
+
+| Opção | Efeito |
+|---|---|
+| `-Porta 8001` | usa outra porta (se a 8000 estiver ocupada) |
+| `-RedeLocal` | permite abrir pelo celular na mesma rede Wi-Fi (o Windows pode pedir para liberar o Python no firewall: aceite apenas para **redes privadas**) |
+| `-SemRecarregar` | não reinicia sozinho ao editar o código |
+
+### Passo 5 — Testar
+
+```powershell
+# Todos os testes automatizados (resultado esperado: "Todos os testes passaram.")
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\testar.ps1
+# Inclui os testes de interface (baixa o Chromium, ~150 MB, só na 1ª vez)
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\testar.ps1 -Interface
+# Repete os testes num PostgreSQL 16 temporário (requer o Docker Desktop aberto)
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\testar.ps1 -PostgreSQL
+```
+
+### Comandos administrativos e atualização
+
+```powershell
+# Trocar a senha
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\cli.ps1 set-password paulo
+# Importar a planilha de clientes pela linha de comando (também dá pela tela Clientes)
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\cli.ps1 import-customers "C:\Users\SEU-USUARIO\Downloads\clientes.xlsx"
+# Remover os dados fictícios antes de usar dados reais
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\cli.ps1 clear-mock
+# Listar todos os comandos
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\cli.ps1 --help
+# Baixar a versão mais recente do código, reinstalar e testar (feche o sistema antes)
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\atualizar.ps1
+```
+
+Com isso, o sistema já roda localmente. Para **publicar na internet**, vá direto para a
+[etapa 6](#6-preparação-para-produção) e a [etapa 7](#7-hospedagem). Os dois caminhos funcionam
+a partir do Windows:
+
+* o **Render** é configurado pelo navegador; o código é enviado com `git push`;
+* para a **VPS**, o Windows já traz o cliente SSH: `ssh root@IP-DO-SERVIDOR`.
 
 ---
 
@@ -541,7 +672,7 @@ Na pasta do projeto, com o ambiente ativo:
 python -m pytest
 ```
 
-O resultado esperado é `135 passed` (o número pode crescer em versões futuras). Os testes **não
+O resultado esperado é `138 passed` (o número pode crescer em versões futuras). Os testes **não
 usam a internet nem os seus dados**: cada teste cria um banco temporário próprio e simula as
 fontes externas.
 
@@ -781,9 +912,11 @@ repositório e se **não** há `.env`, planilhas nem a pasta `data/`.
 
 O endereço aparece no topo da página do serviço, algo como `https://prospeccao-xxxx.onrender.com`.
 
-```bash
-curl https://prospeccao-xxxx.onrender.com/health
-```
+**Linux/macOS:** `curl https://prospeccao-xxxx.onrender.com/health`
+**Windows:** `Invoke-RestMethod https://prospeccao-xxxx.onrender.com/health`
+
+> No Windows PowerShell 5.1, `curl` é um apelido de `Invoke-WebRequest`. Para usar o curl de
+> verdade, que já vem no Windows 10/11, digite `curl.exe`.
 
 A resposta esperada é `{"status":"ok","db":true,…}`. Depois, abra o endereço no navegador e faça
 login com `paulo` e a senha informada.
@@ -839,6 +972,11 @@ No **Windows (PowerShell)**, troque `"$PWD"` por `"${PWD}"` e `$(date +%Y%m%d)` 
 ### 7.2 Alternativa: servidor próprio (VPS) com Docker Compose
 
 Use esta opção se preferir um servidor Linux (Hetzner, DigitalOcean, AWS Lightsail, Contabo, Locaweb…).
+
+> 🪟 **Do Windows:** os comandos desta seção rodam **no servidor Linux**, não no seu computador.
+> Conecte-se pelo PowerShell com o cliente SSH que já vem no Windows 10/11:
+> `ssh root@IP-DO-SERVIDOR`. Na primeira conexão, digite `yes` para confiar no servidor e depois
+> a senha enviada pelo provedor. Para sair: `exit`.
 
 #### 7.2.1 Requisitos do servidor
 
@@ -1081,11 +1219,47 @@ df -h
 sudo docker compose logs --tail=200 app
 ```
 
+**Windows (PowerShell), equivalentes:**
+
+```powershell
+# Saúde do sistema
+Invoke-RestMethod https://SEU-ENDERECO/health
+# Fontes externas, versões e testes (na pasta do projeto)
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\cli.ps1 check-sources
+.\.venv\Scripts\python.exe --version
+.\.venv\Scripts\python.exe -m pip list
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\testar.ps1 -PararNoPrimeiroErro
+# Quem está usando a porta 8000 (o último número é o PID; encerre com: Stop-Process -Id PID)
+netstat -ano | findstr :8000
+# Espaço livre em disco
+Get-PSDrive C
+```
+
+### 9.6 Problemas específicos do Windows
+
+| Erro | Causa | Solução |
+|---|---|---|
+| Digitar `python` abre a **Microsoft Store** | "alias de execução" do Windows | use `py` no lugar de `python`, ou desative em *Configurações → Aplicativos → Configurações avançadas de aplicativos → Aliases de execução de aplicativo* (desligue "python.exe" e "python3.exe") |
+| `py` não é reconhecido | Python instalado sem o lançador, ou terminal antigo | feche e reabra o PowerShell; reinstale com `winget install --id Python.Python.3.12 -e` |
+| "…não pode ser carregado porque a execução de scripts foi desabilitada" | política de execução do PowerShell | execute os scripts com `powershell -ExecutionPolicy Bypass -File …` (como neste tutorial) ou use os `.bat` |
+| "O arquivo … não está assinado digitalmente" / aviso ao abrir o `.bat` | arquivos vindos de um `.zip` baixado da internet | na pasta do projeto: `Get-ChildItem -Recurse \| Unblock-File` |
+| "O Windows protegeu o computador" (SmartScreen) ao abrir o `.bat` | arquivo baixado da internet | *Mais informações → Executar assim mesmo* (confira antes que o arquivo veio do seu repositório) |
+| `pip install` muito lento ou "Access is denied" | antivírus verificando milhares de arquivos, ou pasta protegida | aguarde; mantenha o projeto em `C:\projetos` (fora de *Arquivos de Programas* e do OneDrive) |
+| `database is locked` | pasta sincronizada pelo OneDrive, ou duas janelas do sistema abertas | mova para `C:\projetos`; feche a outra janela |
+| Acentos estranhos no console (`ImportaÃ§Ã£o`) | console antigo sem UTF-8 | os scripts já configuram UTF-8; se persistir, use o **Windows Terminal** (`winget install --id Microsoft.WindowsTerminal -e`) |
+| `.env` "ignorado" depois de editar no Bloco de Notas | — | o sistema aceita UTF-8, UTF-8 com BOM, UTF-16 e ANSI. Confira se o nome é exatamente `.env`, e não `.env.txt` (*Exibir → Extensões de nomes de arquivos*) |
+| `docker` não reconhecido / "error during connect" | Docker Desktop não instalado ou fechado | instale (requer WSL 2: `wsl --install` como administrador e reinicie) e **abra** o Docker Desktop antes de usar `-PostgreSQL` |
+| Caminho muito longo (`Filename too long`) no `git clone` | limite de 260 caracteres do Windows | use uma pasta curta (`C:\projetos`); se precisar: `git config --global core.longpaths true` |
+| `git` converte quebras de linha e scripts `.sh` falham na VPS | conversão CRLF | o `.gitattributes` do projeto já força LF nos arquivos de Linux; clone de novo se o problema vier de uma cópia antiga |
+
 ---
 
 ## 10. Checklist final
 
 ### Ambiente local
+
+> 🪟 **Windows:** os itens abaixo são cobertos por `instalar-windows.bat` (ou `instalar.ps1`),
+> `iniciar-windows.bat` e `testar.ps1`. Confira apenas o resultado de cada um.
 
 - [ ] Git instalado (`git --version`)
 - [ ] Python 3.11–3.13 instalado (`python --version`)
@@ -1097,7 +1271,7 @@ sudo docker compose logs --tail=200 app
 - [ ] `uvicorn prospeccao.main:app_factory --factory --reload` rodando
 - [ ] <http://localhost:8000/health> retorna `"status":"ok"`
 - [ ] Login, busca, página da empresa e lead funcionando
-- [ ] `python -m pytest` com todos os testes aprovados
+- [ ] `python -m pytest` (Windows: `testar.ps1`) com todos os testes aprovados
 
 ### Preparação para produção
 

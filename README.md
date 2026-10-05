@@ -25,6 +25,12 @@ potenciais clientes em todo o Brasil, usando como referência a base de empresas
 > **Passo a passo completo, do zero até a produção (Windows, macOS e Linux):**
 > [docs/08-tutorial-instalacao-e-deploy.md](docs/08-tutorial-instalacao-e-deploy.md)
 
+**Windows:** com Python 3.12 e Git instalados, dê **duplo clique em `instalar-windows.bat`** (uma vez)
+e depois em **`iniciar-windows.bat`**. Os scripts ficam em `scripts/windows/` (`instalar`, `iniciar`,
+`testar`, `cli`, `atualizar`).
+
+**Linux/macOS (ou Windows manualmente):**
+
 ```bash
 python3 -m venv .venv && source .venv/bin/activate     # Windows: py -3.12 -m venv .venv; .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements-dev.txt
@@ -35,7 +41,7 @@ python -m prospeccao.cli seed-mock      # opcional: dados FICTÍCIOS (marcados M
 uvicorn prospeccao.main:app_factory --factory --reload
 ```
 
-Acesse <http://localhost:8000>. Testes: `python -m pytest` (135 testes; Python 3.11–3.13; também
+Acesse <http://localhost:8000>. Testes: `python -m pytest` (138 testes; Python 3.11–3.13; também
 em PostgreSQL com `TEST_DATABASE_URL`).
 
 ## Produção
@@ -71,7 +77,7 @@ src/prospeccao/
   api/        REST JSON          web/  páginas        templates/ static/  interface
   models.py   banco (SQLAlchemy) security.py  autenticação, CSRF, rate limit    cli.py  administração
 tests/        unitários, integração, funcionais, negativos e interface (Playwright)
-scripts/      backup, restauração, atualização via cron, benchmark
+scripts/      backup, restauração, atualização via cron, benchmark; scripts/windows/ (PowerShell)
 deploy/       Caddyfile (HTTPS)
 ```
 
