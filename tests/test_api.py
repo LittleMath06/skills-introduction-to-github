@@ -442,3 +442,17 @@ def test_hosting_database_url_is_normalized():
     assert normalize_database_url("postgresql://u:p@h/db") == "postgresql+psycopg://u:p@h/db"
     assert normalize_database_url("postgresql+psycopg://x") == "postgresql+psycopg://x"
     assert normalize_database_url("sqlite:///a.db") == "sqlite:///a.db"
+
+
+def test_empty_secret_key_in_env_file(monkeypatch, tmp_path):
+    env = tmp_path / ".env"
+    env.write_text("SECRET_KEY=\nADMIN_PASSWORD=\nDATABASE_URL=\n", encoding="utf-8")
+    for k in ("SECRET_KEY", "ADMIN_PASSWORD", "DATABASE_URL", "APP_ENV"):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv("ENV_FILE", str(env))
+    s = load_settings()
+    assert s.secret_key and s.database_url.startswith("sqlite") and s.admin_password is None
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("ALLOW_MOCK_DATA", "false")
+    with pytest.raises(RuntimeError, match="SECRET_KEY"):
+        load_settings()

@@ -80,7 +80,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("cnpj")
     args = parser.parse_args(argv)
 
-    settings = _setup()
+    try:
+        settings = _setup()
+    except RuntimeError as exc:  # configuração inválida (.env): mensagem clara, sem traceback
+        print(f"Erro de configuração: {exc}", file=sys.stderr)
+        return 2
     sources = Sources(settings)
 
     if args.cmd == "init":

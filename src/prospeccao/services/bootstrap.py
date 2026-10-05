@@ -35,8 +35,11 @@ def ensure_admin(session: Session, settings: Settings) -> None:
         log.warning("Nenhum usuário cadastrado. Defina ADMIN_PASSWORD ou rode "
                     "`python -m prospeccao.cli set-password`.")
         return
-    session.add(User(username=settings.admin_username.lower(),
-                     password_hash=hash_password(settings.admin_password)))
+    try:
+        password_hash = hash_password(settings.admin_password)
+    except ValueError as exc:
+        raise RuntimeError(f"ADMIN_PASSWORD inválida no .env: {exc}") from exc
+    session.add(User(username=settings.admin_username.lower(), password_hash=password_hash))
     log.info("Usuário %s criado a partir de ADMIN_PASSWORD", settings.admin_username)
 
 

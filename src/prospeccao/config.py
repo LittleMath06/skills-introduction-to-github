@@ -81,7 +81,8 @@ def load_settings() -> Settings:
     _load_dotenv(Path(os.environ.get("ENV_FILE", ".env")))
     env = os.environ.get("APP_ENV", "development").lower()
     data_dir = Path(os.environ.get("DATA_DIR", "./data")).resolve()
-    secret = os.environ.get("SECRET_KEY", DEV_SECRET)
+    # vazio no .env conta como "não definido" (usa a chave de desenvolvimento; bloqueada em produção)
+    secret = os.environ.get("SECRET_KEY") or DEV_SECRET
     try:
         endpoints = json.loads(os.environ.get("ICMS_ENDPOINTS", "{}") or "{}")
     except json.JSONDecodeError as exc:
